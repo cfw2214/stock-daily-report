@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 # ═══════════════════════════════════════════════════════════════
 
 TICKERS = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'META', 'TSLA',
-           'TSM', 'MU', 'SNDK', 'NFLX']
+           'TSM', 'MU', 'SNDK', 'NFLX', 'AMD', 'AVGO', 'COST']
 
 MAG7 = {'AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'META', 'TSLA'}
 
@@ -36,6 +36,9 @@ MORNINGSTAR = {
     'MU':    {'fv': 115,  'stars': 4, 'moat': 'None'},
     'SNDK':  {'fv': 138,  'stars': 5, 'moat': 'None'},
     'NFLX':  {'fv': 79,   'stars': 3, 'moat': 'Narrow'},
+    'AMD':   {'fv': 145,  'stars': 3, 'moat': 'Narrow'},
+    'AVGO':  {'fv': 258,  'stars': 3, 'moat': 'Wide'},
+    'COST':  {'fv': 700,  'stars': 2, 'moat': 'Wide'},
 }
 
 # 輸出資料夾：預設桌面，有 Google Drive 請改為同步路徑
@@ -675,7 +678,7 @@ td{{padding:13px 14px;vertical-align:middle}}
 <div class="hdr">
   <div>
     <h1>📊 美股每日開盤掃描報告</h1>
-    <div class="sub">Magnificent 7 + TSM · MU · SNDK · NFLX　｜　真實數據 yfinance　｜　晨星估值 · OI · IV · P/C Ratio</div>
+    <div class="sub">Magnificent 7 + TSM · MU · SNDK · NFLX · AMD · AVGO · COST　｜　真實數據 yfinance　｜　晨星估值 · OI · IV · P/C Ratio</div>
   </div>
   <div class="hdr-r">
     <div class="dt">{display_date}</div>
@@ -805,7 +808,7 @@ def main():
     vix = fetch_vix()
     print(f'  VIX: {vix["value"]} ({vix["change"]:+.2f})')
 
-    print('\n[2/4] 抓取個股數據（共 11 支）...')
+    print('\n[2/4] 抓取個股數據（共 14 支）...')
     stocks = []
     for ticker in TICKERS:
         stocks.append(fetch_stock(ticker))
