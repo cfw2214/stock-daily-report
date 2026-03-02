@@ -468,17 +468,12 @@ def fetch_spy_qqq():
                 calls['openInterest'] = pd.to_numeric(calls['openInterest'], errors='coerce').fillna(0)
                 puts['openInterest']  = pd.to_numeric(puts['openInterest'],  errors='coerce').fillna(0)
                 res = {'expiry': best}
-
-                res = {'expiry': best}
                 puts_below = puts[puts['strike'] <= price * 1.02]
                 if not puts_below.empty:
                     res['put_wall'] = float(puts_below.loc[puts_below['openInterest'].idxmax(), 'strike'])
                 calls_above = calls[calls['strike'] >= price * 0.98]
                 if not calls_above.empty:
                     res['call_wall'] = float(calls_above.loc[calls_above['openInterest'].idxmax(), 'strike'])
-                res['max_pain'] = calc_max_pain(calls, puts, current_price=price)
-                return res, calls, puts
-
                 res['max_pain'] = calc_max_pain(calls, puts, current_price=price)
                 return res, calls, puts
 
