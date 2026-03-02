@@ -330,6 +330,10 @@ def fetch_stock(ticker):
         last_calls = None
         last_puts  = pd.DataFrame()
 
+        # 四週累積流量用容器
+        all_calls_list = []
+        all_puts_list  = []
+
         try:
             available = t.options
             four_weeks = get_four_weekly_expiries()
@@ -337,7 +341,7 @@ def fetch_stock(ticker):
             # ── 四週期權 OI ─────────────────────────────
             for i, wk_info in enumerate(four_weeks):
                 k = WEEK_KEYS[i]
-                d[f'{k}_label']     = wk_info['label']
+                d[f'{k}_label']      = wk_info['label']
                 d[f'{k}_is_monthly'] = wk_info['is_monthly']
                 try:
                     res, calls_df, puts_df = _fetch_oi(wk_info['date'], available)
@@ -350,73 +354,82 @@ def fetch_stock(ticker):
                     monthly_note = '★月結' if wk_info['is_monthly'] else ''
                     print(f'    {wk_info["label"]}{monthly_note} ({d[f"{k}_expiry"]})  Put牆:{d[f"{k}_put_wall"]}  Pain:{d[f"{k}_max_pain"]}  Call牆:{d[f"{k}_call_wall"]}')
 
-                    # ── 流量訊號：用本週(w0)鏈計算 ──────────
-                    if i == 0:
-                        try:
-                            c_vol = pd.to_numeric(calls_df['volume'], errors='coerce').fillna(0)
-                            p_vol = pd.to_numeric(puts_df['volume'],  errors='coerce').fillna(0)
-                            c_oi  = pd.to_numeric(calls_df['openInterest'], errors='coerce').fillna(0)
-                            p_oi  = pd.to_numeric(puts_df['openInterest'],  errors='coerce').fillna(0)
-
-                            total_cv = float(c_vol.sum())
-                            total_pv = float(p_vol.sum())
-                            total_coi = float(c_oi.sum())
-                            total_poi = float(p_oi.sum())
-
-                            d['flow_call_vol'] = int(total_cv)
-                            d['flow_put_vol']  = int(total_pv)
-                            d['flow_call_oi']  = int(total_coi)
-                            d['flow_put_oi']   = int(total_poi)
-
-                            # vol/OI 比（>1 = 今日成交量超過所有未平倉，強烈新建倉信號）
-                            d['flow_call_ratio'] = round(total_cv / total_coi, 2) if total_coi > 0 else None
-                            d['flow_put_ratio']  = round(total_pv / total_poi, 2) if total_poi > 0 else None
-
-                            # 估算 premium：call mid * vol - put mid * vol（近 ATM 5 檔）
-                            def atm_premium(df, vol_series):
-                                df = df.copy()
-                                df['mid'] = (pd.to_numeric(df.get('bid', 0), errors='coerce').fillna(0) +
-                                             pd.to_numeric(df.get('ask', 0), errors='coerce').fillna(0)) / 2
-                                df['vol'] = vol_series.values
-                                atm_idx = (df['strike'] - price).abs().argsort()[:5]
-                                atm = df.iloc[atm_idx]
-                                return float((atm['mid'] * atm['vol']).sum())
-
-                            call_prem = atm_premium(calls_df, c_vol)
-                            put_prem  = atm_premium(puts_df,  p_vol)
-                            d['flow_premium'] = round(call_prem - put_prem, 0)
-
-                            # 判斷訊號
-                            cr = d['flow_call_ratio'] or 0
-                            pr = d['flow_put_ratio']  or 0
-                            prem = d['flow_premium']  or 0
-
-                            THRESH = 0.5   # vol/OI 超過 0.5 視為異常活躍
-
-                            call_active = cr > THRESH
-                            put_active  = pr > THRESH
-                            call_dom    = total_cv > total_pv * 1.5
-                            put_dom     = total_pv > total_cv * 1.5
-
-                            if call_active and call_dom and prem > 0:
-                                d['flow_signal'] = 'CALL_SWEEP'
-                                d['flow_note']   = f'Call 掃單 (vol/OI={cr:.2f}，溢價 ${prem:,.0f})'
-                            elif put_active and put_dom and prem < 0:
-                                d['flow_signal'] = 'PUT_SWEEP'
-                                d['flow_note']   = f'Put 掃單 (vol/OI={pr:.2f}，溢價 ${abs(prem):,.0f})'
-                            elif call_active and put_active:
-                                d['flow_signal'] = 'MIXED'
-                                d['flow_note']   = f'雙向異常 (C={cr:.2f} P={pr:.2f})'
-                            else:
-                                d['flow_signal'] = 'NEUTRAL'
-                                d['flow_note']   = '無異常流量'
-
-                            print(f'    流量訊號: {d["flow_signal"]} | {d["flow_note"]}')
-                        except Exception as fe:
-                            print(f'    流量計算錯誤: {fe}')
+                    # 累積四週數據供流量計算
+                    all_calls_list.append(calls_df)
+                    all_puts_list.append(puts_df)
 
                 except Exception as e:
                     print(f'    {wk_info["label"]}期權錯誤 {ticker}: {e}')
+
+            # ── 流量訊號：四週全部加總計算 ──────────────────
+            if all_calls_list:
+                try:
+                    # 合併四週期權鏈
+                    all_calls = pd.concat(all_calls_list, ignore_index=True)
+                    all_puts  = pd.concat(all_puts_list,  ignore_index=True) if all_puts_list else pd.DataFrame()
+
+                    c_vol = pd.to_numeric(all_calls['volume'],       errors='coerce').fillna(0)
+                    p_vol = pd.to_numeric(all_puts['volume'],        errors='coerce').fillna(0) if not all_puts.empty else pd.Series([0])
+                    c_oi  = pd.to_numeric(all_calls['openInterest'], errors='coerce').fillna(0)
+                    p_oi  = pd.to_numeric(all_puts['openInterest'],  errors='coerce').fillna(0) if not all_puts.empty else pd.Series([0])
+
+                    total_cv  = float(c_vol.sum())
+                    total_pv  = float(p_vol.sum())
+                    total_coi = float(c_oi.sum())
+                    total_poi = float(p_oi.sum())
+
+                    d['flow_call_vol'] = int(total_cv)
+                    d['flow_put_vol']  = int(total_pv)
+                    d['flow_call_oi']  = int(total_coi)
+                    d['flow_put_oi']   = int(total_poi)
+
+                    # vol/OI 比（四週加總，>1 = 今日建倉超過歷史累積）
+                    d['flow_call_ratio'] = round(total_cv / total_coi, 2) if total_coi > 0 else None
+                    d['flow_put_ratio']  = round(total_pv / total_poi, 2) if total_poi > 0 else None
+
+                    # Premium 估算：全部到期日的 ATM ±10% 範圍內 mid × volume
+                    def calc_premium_allexp(df, vol_series):
+                        df = df.copy()
+                        df['mid'] = (pd.to_numeric(df.get('bid', 0), errors='coerce').fillna(0) +
+                                     pd.to_numeric(df.get('ask', 0), errors='coerce').fillna(0)) / 2
+                        df['vol'] = vol_series.values
+                        # 過濾現價 ±10% 範圍（排除極遠 OTM 噪音）
+                        in_range = (df['strike'] >= price * 0.90) & (df['strike'] <= price * 1.10)
+                        df = df[in_range]
+                        return float((df['mid'] * df['vol']).sum())
+
+                    call_prem = calc_premium_allexp(all_calls, c_vol)
+                    put_prem  = calc_premium_allexp(all_puts,  p_vol) if not all_puts.empty else 0.0
+                    d['flow_premium'] = round(call_prem - put_prem, 0)
+
+                    # 判斷訊號
+                    cr   = d['flow_call_ratio'] or 0
+                    pr   = d['flow_put_ratio']  or 0
+                    prem = d['flow_premium']    or 0
+
+                    # 閾值：四週合計 vol/OI > 0.3 就算異常（比單週標準寬鬆）
+                    THRESH    = 0.3
+                    call_active = cr > THRESH
+                    put_active  = pr > THRESH
+                    call_dom    = total_cv > total_pv * 1.5
+                    put_dom     = total_pv > total_cv * 1.5
+
+                    if call_active and call_dom and prem > 0:
+                        d['flow_signal'] = 'CALL_SWEEP'
+                        d['flow_note']   = f'Call 掃單 4週加總 (vol/OI={cr:.2f}，淨溢價 ${prem:,.0f})'
+                    elif put_active and put_dom and prem < 0:
+                        d['flow_signal'] = 'PUT_SWEEP'
+                        d['flow_note']   = f'Put 掃單 4週加總 (vol/OI={pr:.2f}，淨溢價 ${abs(prem):,.0f})'
+                    elif call_active and put_active:
+                        d['flow_signal'] = 'MIXED'
+                        d['flow_note']   = f'雙向異常 4週 (C={cr:.2f} P={pr:.2f})'
+                    else:
+                        d['flow_signal'] = 'NEUTRAL'
+                        d['flow_note']   = '無異常流量'
+
+                    print(f'    流量訊號(4週): {d["flow_signal"]} | {d["flow_note"]}')
+                except Exception as fe:
+                    print(f'    流量計算錯誤: {fe}')
 
             # ── IV / IVR / P/C（用最近一週期鏈）─────────
             if last_calls is not None:
@@ -443,7 +456,7 @@ def fetch_stock(ticker):
 
 
 def fetch_spy_qqq():
-    """抓取 SPY / QQQ 技術面數據 + 四週期權 OI & Max Pain"""
+    """抓取 SPY / QQQ 技術面數據 + 四週期權 OI & Max Pain & 四週流量"""
     result = {}
     four_weeks = get_four_weekly_expiries()
     WEEK_KEYS = ['w0', 'w1', 'w2', 'w3']
@@ -462,6 +475,14 @@ def fetch_spy_qqq():
                 'change_pct': round((price - prev) / prev * 100, 2),
                 'ma50':       round(float(closes.rolling(50).mean().iloc[-1]), 2),
                 'ma200':      round(float(closes.rolling(200).mean().iloc[-1]), 2),
+                # 流量欄位
+                'flow_signal':     None,
+                'flow_call_vol':   None,
+                'flow_put_vol':    None,
+                'flow_call_ratio': None,
+                'flow_put_ratio':  None,
+                'flow_premium':    None,
+                'flow_note':       '',
             }
 
             # 初始化四週期權欄位
@@ -494,22 +515,77 @@ def fetch_spy_qqq():
                 if not calls_above.empty:
                     res['call_wall'] = float(calls_above.loc[calls_above['openInterest'].idxmax(), 'strike'])
                 res['max_pain'] = calc_max_pain(calls, puts, current_price=price)
-                return res
+                return res, calls, puts
+
+            all_calls_list = []
+            all_puts_list  = []
 
             for i, wk_info in enumerate(four_weeks):
                 k = WEEK_KEYS[i]
                 entry[f'{k}_label']      = wk_info['label']
                 entry[f'{k}_is_monthly'] = wk_info['is_monthly']
                 try:
-                    res = _fetch_oi_etf(wk_info['date'])
+                    res, calls_df, puts_df = _fetch_oi_etf(wk_info['date'])
                     entry[f'{k}_expiry']    = res.get('expiry')
                     entry[f'{k}_put_wall']  = res.get('put_wall')
                     entry[f'{k}_call_wall'] = res.get('call_wall')
                     entry[f'{k}_max_pain']  = res.get('max_pain')
+                    all_calls_list.append(calls_df)
+                    all_puts_list.append(puts_df)
                     mo_note = '★月結' if wk_info['is_monthly'] else ''
                     print(f'    {sym} {wk_info["label"]}{mo_note} ({entry[f"{k}_expiry"]})  Put牆:{entry[f"{k}_put_wall"]}  Pain:{entry[f"{k}_max_pain"]}  Call牆:{entry[f"{k}_call_wall"]}')
                 except Exception as e:
                     print(f'    {sym} {wk_info["label"]}期權錯誤: {e}')
+
+            # ── 四週流量加總 ──────────────────────────────
+            if all_calls_list:
+                try:
+                    ac = pd.concat(all_calls_list, ignore_index=True)
+                    ap = pd.concat(all_puts_list,  ignore_index=True) if all_puts_list else pd.DataFrame()
+
+                    c_vol = pd.to_numeric(ac['volume'],       errors='coerce').fillna(0)
+                    p_vol = pd.to_numeric(ap['volume'],       errors='coerce').fillna(0) if not ap.empty else pd.Series([0])
+                    c_oi  = pd.to_numeric(ac['openInterest'], errors='coerce').fillna(0)
+                    p_oi  = pd.to_numeric(ap['openInterest'], errors='coerce').fillna(0) if not ap.empty else pd.Series([0])
+
+                    tcv = float(c_vol.sum()); tpv = float(p_vol.sum())
+                    tco = float(c_oi.sum());  tpo = float(p_oi.sum())
+
+                    entry['flow_call_vol']   = int(tcv)
+                    entry['flow_put_vol']    = int(tpv)
+                    entry['flow_call_ratio'] = round(tcv / tco, 2) if tco > 0 else None
+                    entry['flow_put_ratio']  = round(tpv / tpo, 2) if tpo > 0 else None
+
+                    def etf_prem(df, vol_s):
+                        df = df.copy(); df['mid'] = (pd.to_numeric(df.get('bid',0),errors='coerce').fillna(0)+pd.to_numeric(df.get('ask',0),errors='coerce').fillna(0))/2
+                        df['vol'] = vol_s.values; rng = (df['strike']>=price*0.90)&(df['strike']<=price*1.10)
+                        return float((df[rng]['mid']*df[rng]['vol']).sum())
+
+                    cp = etf_prem(ac, c_vol)
+                    pp = etf_prem(ap, p_vol) if not ap.empty else 0.0
+                    entry['flow_premium'] = round(cp - pp, 0)
+
+                    cr = entry['flow_call_ratio'] or 0
+                    pr = entry['flow_put_ratio']  or 0
+                    prem = entry['flow_premium']  or 0
+                    THRESH = 0.3
+
+                    if cr > THRESH and tcv > tpv * 1.5 and prem > 0:
+                        entry['flow_signal'] = 'CALL_SWEEP'
+                        entry['flow_note']   = f'Call 掃單 4週 (vol/OI={cr:.2f}，淨溢價 ${prem:,.0f})'
+                    elif pr > THRESH and tpv > tcv * 1.5 and prem < 0:
+                        entry['flow_signal'] = 'PUT_SWEEP'
+                        entry['flow_note']   = f'Put 掃單 4週 (vol/OI={pr:.2f}，淨溢價 ${abs(prem):,.0f})'
+                    elif cr > THRESH and pr > THRESH:
+                        entry['flow_signal'] = 'MIXED'
+                        entry['flow_note']   = f'雙向異常 4週 (C={cr:.2f} P={pr:.2f})'
+                    else:
+                        entry['flow_signal'] = 'NEUTRAL'
+                        entry['flow_note']   = '無異常流量'
+
+                    print(f'    {sym} 流量訊號(4週): {entry["flow_signal"]} | {entry["flow_note"]}')
+                except Exception as fe:
+                    print(f'    {sym} 流量計算錯誤: {fe}')
 
             result[sym] = entry
         except Exception:
@@ -858,6 +934,9 @@ def generate_report(stocks, vix, spy_qqq, date_str):
     spy_oi_grid = etf_oi_grid_html(spy)
     qqq_oi_grid = etf_oi_grid_html(qqq)
 
+    spy_flow_html = flow_html(spy)
+    qqq_flow_html = flow_html(qqq)
+
     now_tw = datetime.now().strftime('%Y-%m-%d %H:%M')
     weekday_map = {0:'一',1:'二',2:'三',3:'四',4:'五',5:'六',6:'日'}
     wd = weekday_map[datetime.now().weekday()]
@@ -1090,6 +1169,10 @@ td{{padding:13px 14px;vertical-align:middle}}
         {spy_oi_grid}
       </div>
     </div>
+    <div style="margin-top:10px;border-top:1px solid #21262d;padding-top:8px">
+      <div class="oi-lbl" style="margin-bottom:6px;letter-spacing:0.5px;color:#a371f7">機構流量（四週加總）</div>
+      {spy_flow_html}
+    </div>
   </div>
   <div class="mkc">
     <div class="mkc-hdr">
@@ -1106,6 +1189,10 @@ td{{padding:13px 14px;vertical-align:middle}}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         {qqq_oi_grid}
       </div>
+    </div>
+    <div style="margin-top:10px;border-top:1px solid #21262d;padding-top:8px">
+      <div class="oi-lbl" style="margin-bottom:6px;letter-spacing:0.5px;color:#a371f7">機構流量（四週加總）</div>
+      {qqq_flow_html}
     </div>
   </div>
 </div>
