@@ -661,7 +661,7 @@ def pc_html(pc):
 
 
 def flow_html(d):
-    """渲染期權流量訊號欄位"""
+    """渲染期權流量訊號欄位（含 tooltip 說明）"""
     sig  = d.get('flow_signal')
     note = d.get('flow_note', '')
     cv   = d.get('flow_call_vol')
@@ -685,23 +685,38 @@ def flow_html(d):
     if sig == 'CALL_SWEEP':
         badge_cls  = 'flow-call'
         badge_text = '🟢 Call Sweep'
+        badge_tip  = '今天 Call 成交量異常放大，且買方花費的溢價高於 Put 方。代表有人在積極佈局看多倉位。'
     elif sig == 'PUT_SWEEP':
         badge_cls  = 'flow-put'
         badge_text = '🔴 Put Sweep'
+        badge_tip  = '今天 Put 成交量異常放大，且買方花費的溢價高於 Call 方。代表有人在積極買入保護或押注下跌。'
     elif sig == 'MIXED':
         badge_cls  = 'flow-mix'
         badge_text = '🟡 雙向異常'
+        badge_tip  = 'Call 與 Put 兩側今天都異常放量。可能是機構在做 Straddle（賭波動），方向不明，需觀察後續。'
     else:
         badge_cls  = 'flow-neu'
         badge_text = '⚪ 無異常'
+        badge_tip  = '今天期權成交量相對於未平倉量處於正常水平，沒有偵測到明顯的大戶建倉行為。'
 
     ratio_bar_c = min(int((cr or 0) / 2 * 100), 100)
     ratio_bar_p = min(int((pr or 0) / 2 * 100), 100)
 
-    return f'''<div class="{badge_cls} flow-badge">{badge_text}</div>
-<div class="flow-row"><span class="flow-lbl">C vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-c" style="width:{ratio_bar_c}%"></span></span><span class="flow-val">{cr:.2f}x</span></div>
-<div class="flow-row"><span class="flow-lbl">P vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-p" style="width:{ratio_bar_p}%"></span></span><span class="flow-val">{pr:.2f}x</span></div>
-<div class="flow-row" style="margin-top:3px"><span class="flow-lbl" style="color:#484f58">C{fmt_k(cv)}/P{fmt_k(pv)}</span><span class="flow-val" style="color:{"#3fb950" if (prem or 0)>=0 else "#f85149"}">{fmt_prem(prem)}</span></div>''' if cr is not None and pr is not None else f'<div class="{badge_cls} flow-badge">{badge_text}</div><div style="font-size:0.7em;color:#484f58">{note}</div>'
+    vol_oi_tip  = ('vol/OI 比率：今日成交量 ÷ 歷史未平倉量。'
+                   '0.1x = 正常冷清；0.3x+ = 開始異常；1.0x+ = 今天買的量等於所有歷史累積，極度罕見。'
+                   '進度條滿格 = 2.0x。綠色=Call熱，紅色=Put熱。')
+    vol_num_tip = ('C = 今日 Call 成交口數，P = 今日 Put 成交口數。K = 千口合約。'
+                   '數字越大、兩側差距越懸殊，訊號越清晰。')
+    prem_tip    = ('淨溢價 = Call買方花費 − Put買方花費（ATM附近±10%範圍）。'
+                   '正數(+) = 多頭錢流入；負數(-) = 空頭錢流入或機構在避險。'
+                   '金額越大代表押注越重，比口數更能反映真實意圖。')
+
+    prem_color = '#3fb950' if (prem or 0) >= 0 else '#f85149'
+
+    return f'''<div class="tip {badge_cls} flow-badge">{badge_text}<span class="tip-txt">{badge_tip}</span></div>
+<div class="tip flow-row"><span class="flow-lbl">C vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-c" style="width:{ratio_bar_c}%"></span></span><span class="flow-val">{f"{cr:.2f}x" if cr is not None else "—"}</span><span class="tip-txt">{vol_oi_tip}</span></div>
+<div class="tip flow-row"><span class="flow-lbl">P vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-p" style="width:{ratio_bar_p}%"></span></span><span class="flow-val">{f"{pr:.2f}x" if pr is not None else "—"}</span><span class="tip-txt">{vol_oi_tip}</span></div>
+<div class="tip flow-row" style="margin-top:3px"><span class="flow-lbl" style="color:#484f58">C{fmt_k(cv)}/P{fmt_k(pv)}</span><span class="flow-val" style="color:{prem_color}">{fmt_prem(prem)}</span><span class="tip-txt">{prem_tip}</span></div>''' if cr is not None and pr is not None else f'<div class="tip {badge_cls} flow-badge">{badge_text}<span class="tip-txt">{badge_tip}</span></div><div style="font-size:0.7em;color:#484f58">{note}</div>'
 
 
 def ms_html(ticker, price):
@@ -1053,6 +1068,10 @@ td{{padding:13px 14px;vertical-align:middle}}
 .flow-bar-c{{display:block;height:100%;background:#3fb950;border-radius:2px}}
 .flow-bar-p{{display:block;height:100%;background:#f85149;border-radius:2px}}
 .flow-val{{font-family:monospace;font-size:0.72em;color:#c9d1d9;white-space:nowrap}}
+.tip{{position:relative;display:inline-block;cursor:help}}
+.tip .tip-txt{{visibility:hidden;opacity:0;background:#1c2128;color:#c9d1d9;font-size:0.72em;line-height:1.6;border:1px solid #444c56;border-radius:8px;padding:10px 13px;width:260px;position:absolute;z-index:999;bottom:130%;left:50%;transform:translateX(-50%);transition:opacity .18s;pointer-events:none;white-space:normal;font-weight:400;box-shadow:0 4px 16px rgba(0,0,0,.5)}}
+.tip:hover .tip-txt{{visibility:visible;opacity:1}}
+.tip-icon{{font-size:0.7em;color:#484f58;margin-left:3px;vertical-align:middle}}
 </style>
 </head>
 <body>
@@ -1111,9 +1130,19 @@ td{{padding:13px 14px;vertical-align:middle}}
   <span class="oi-put">▲ Put Wall</span> = 支撐　｜　<span style="color:#e3b341">月結</span> = 當月第三週五
   <span>｜</span>
   <strong style="color:#a371f7">機構流量：</strong>
-  <span class="flow-badge flow-call">🟢 Call Sweep</span> vol/OI &gt;0.5 且 Call 主導
-  <span class="flow-badge flow-put">🔴 Put Sweep</span> vol/OI &gt;0.5 且 Put 主導
-  <span class="flow-badge flow-mix">🟡 雙向異常</span> 雙側同時放量　｜　vol/OI &gt;1 = 今日新建倉超過歷史累積
+  <span class="flow-badge flow-call">🟢 Call Sweep</span> vol/OI &gt;0.3 且 Call 主導
+  <span class="flow-badge flow-put">🔴 Put Sweep</span> vol/OI &gt;0.3 且 Put 主導
+  <span class="flow-badge flow-mix">🟡 雙向異常</span> 雙側同時放量
+  <span class="tip" style="cursor:help">　<span style="color:#a371f7">❓ 什麼是 vol/OI？</span><span class="tip-txt" style="left:0;transform:none;width:300px">
+    vol = 今日成交量（今天新增的交易）<br>
+    OI = 未平倉量（歷史累積的倉位）<br><br>
+    比值代表今天有多積極：<br>
+    0.1x = 正常冷清<br>
+    0.3x+ = 開始異常，有人在建倉<br>
+    1.0x+ = 今天買的量超過歷史所有累積，極罕見<br><br>
+    淨溢價 = Call買方花費 − Put買方花費<br>
+    正數 = 多頭錢流入　負數 = 空頭錢流入
+  </span></span>
 </div>
 
 <div class="stitle">📋 個股全覽</div>
@@ -1124,7 +1153,16 @@ td{{padding:13px 14px;vertical-align:middle}}
   <th rowspan="2">代碼</th>
   <th rowspan="2">現價</th>
   <th colspan="4" class="th-grp" style="color:#58a6ff;min-width:440px">── OI 支撐壓力（本週 / 下週 / 下下週 / 下下下週）──</th>
-  <th rowspan="2" class="th-grp" style="color:#a371f7;min-width:140px">── 機構流量 ──</th>
+  <th rowspan="2" class="th-grp" style="color:#a371f7;min-width:140px">
+    <span class="tip">── 機構流量 ──<span class="tip-txt" style="font-size:0.85em;left:0;transform:none">
+      模擬 Barchart 流量法，掃描四週期權加總。<br>
+      🟢 Call Sweep = 今天大量新買 Call，看多訊號<br>
+      🔴 Put Sweep = 今天大量新買 Put，避險或看空<br>
+      🟡 雙向異常 = 兩側都放量，方向不明<br>
+      ⚪ 無異常 = 今天流量正常<br><br>
+      滑鼠移到各數字上可看詳細說明。
+    </span></span>
+  </th>
   <th rowspan="2">漲跌$</th>
   <th rowspan="2">漲跌%</th>
   <th rowspan="2">量比</th>
