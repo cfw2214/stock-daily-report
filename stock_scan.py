@@ -323,74 +323,20 @@ def fetch_stock(ticker):
 
             result = {'expiry': best}
 
-            # 計算到期時間（年）
-            today = datetime.today()
-            expiry_dt = datetime.strptime(best, '%Y-%m-%d')
-            T = max((expiry_dt - today).days / 365.0, 1/365)
+            # Put Wall（現價以下 OI 最大的 Put strike）
+            puts_below = puts[puts['strike'] <= price * 1.02]
+            if not puts_below.empty:
+                result['put_wall'] = float(puts_below.loc[puts_below['openInterest'].idxmax(), 'strike'])
 
-            # ── Gamma Wall（取代 OI Wall）────────────────────
-            def add_gex(df, is_call):
-                df = df.copy()
-                if 'impliedVolatility' in df.columns:
-                    iv_raw = pd.to_numeric(df['impliedVolatility'], errors='coerce')
-                else:
-                    iv_raw = pd.Series([0.0] * len(df), index=df.index)
-                iv_median = iv_raw[iv_raw > 0.01].median()
-                if pd.isna(iv_median) or iv_median <= 0:
-                    iv_median = 0.50
-                df['iv'] = iv_raw.where(iv_raw > 0.01, iv_median)
-                df['oi'] = pd.to_numeric(df['openInterest'], errors='coerce').fillna(0)
-                # 逐行計算 gamma，單行失敗不影響其他行
-                gammas = []
-                for _, r in df.iterrows():
-                    try:
-                        gammas.append(_bs_gamma(price, r['strike'], T, float(r['iv'])))
-                    except Exception:
-                        gammas.append(0.0)
-                df['gamma'] = gammas
-                df['gex'] = df['gamma'] * df['oi'] * 100
-                if not is_call:
-                    df['gex'] = -df['gex']
-                return df
+            # Call Wall（現價以上 OI 最大的 Call strike）
+            calls_above = calls[calls['strike'] >= price * 0.98]
+            if not calls_above.empty:
+                result['call_wall'] = float(calls_above.loc[calls_above['openInterest'].idxmax(), 'strike'])
 
-            # GEX 計算，失敗時 fallback 到 OI
-            try:
-                calls_g = add_gex(calls, is_call=True)
-                puts_g  = add_gex(puts,  is_call=False)
-                use_gex = True
-                print(f'      GEX ok: call_gex_max={calls_g["gex"].max():.1f}  put_gex_min={puts_g["gex"].min():.1f}')
-            except Exception as gex_err:
-                print(f'      GEX 計算失敗({gex_err})，退回 OI')
-                use_gex = False
+            # Max Pain
+            result['max_pain'] = calc_max_pain(calls, puts, current_price=price)
 
-            # Call Gamma Wall
-            if use_gex:
-                calls_above = calls_g[calls_g['strike'] >= price * 0.98]
-                if not calls_above.empty and calls_above['gex'].max() > 0:
-                    result['call_wall'] = float(calls_above.loc[calls_above['gex'].idxmax(), 'strike'])
-            if result.get('call_wall') is None:  # fallback
-                calls_above_oi = calls[calls['strike'] >= price * 0.98]
-                if not calls_above_oi.empty:
-                    result['call_wall'] = float(calls_above_oi.loc[calls_above_oi['openInterest'].idxmax(), 'strike'])
-
-            # Put Gamma Wall
-            if use_gex:
-                puts_below = puts_g[puts_g['strike'] <= price * 1.02].copy()
-                if not puts_below.empty:
-                    puts_below['abs_gex'] = puts_below['gex'].abs()
-                    if puts_below['abs_gex'].max() > 0:
-                        result['put_wall'] = float(puts_below.loc[puts_below['abs_gex'].idxmax(), 'strike'])
-            if result.get('put_wall') is None:  # fallback
-                puts_below_oi = puts[puts['strike'] <= price * 1.02]
-                if not puts_below_oi.empty:
-                    result['put_wall'] = float(puts_below_oi.loc[puts_below_oi['openInterest'].idxmax(), 'strike'])
-
-            # Max Pain（傳入現價做範圍過濾）
-            mp_val = calc_max_pain(calls, puts, current_price=price)
-            result['max_pain'] = mp_val
-            print(f'      → Max Pain debug: calls={len(calls)}筆 puts={len(puts)}筆 result={mp_val}')
-
-            return result, calls, puts  # 永遠回傳 3-tuple
+            return result, calls, puts
 
         # 初始化 — 避免 NameError
         last_calls = None
@@ -523,59 +469,15 @@ def fetch_spy_qqq():
                 puts['openInterest']  = pd.to_numeric(puts['openInterest'],  errors='coerce').fillna(0)
                 res = {'expiry': best}
 
-                # 計算到期時間（年）
-                T = max((datetime.strptime(best, '%Y-%m-%d') - datetime.today()).days / 365.0, 1/365)
-
-                def add_gex_etf(df, is_call):
-                    df = df.copy()
-                    if 'impliedVolatility' in df.columns:
-                        iv_raw = pd.to_numeric(df['impliedVolatility'], errors='coerce')
-                    else:
-                        iv_raw = pd.Series([0.0] * len(df), index=df.index)
-                    iv_median = iv_raw[iv_raw > 0.01].median()
-                    if pd.isna(iv_median) or iv_median <= 0:
-                        iv_median = 0.20
-                    df['iv']  = iv_raw.where(iv_raw > 0.01, iv_median)
-                    df['oi']  = pd.to_numeric(df['openInterest'], errors='coerce').fillna(0)
-                    gammas = []
-                    for _, r in df.iterrows():
-                        try:
-                            gammas.append(_bs_gamma(price, r['strike'], T, float(r['iv'])))
-                        except Exception:
-                            gammas.append(0.0)
-                    df['gamma'] = gammas
-                    df['gex'] = df['gamma'] * df['oi'] * 100
-                    if not is_call:
-                        df['gex'] = -df['gex']
-                    return df
-
-                try:
-                    calls_g = add_gex_etf(calls, is_call=True)
-                    puts_g  = add_gex_etf(puts,  is_call=False)
-                    use_gex = True
-                except Exception as ge:
-                    print(f'    {sym} GEX 失敗({ge})，退回 OI')
-                    use_gex = False
-
-                if use_gex:
-                    calls_above = calls_g[calls_g['strike'] >= price * 0.98]
-                    if not calls_above.empty and calls_above['gex'].max() > 0:
-                        res['call_wall'] = float(calls_above.loc[calls_above['gex'].idxmax(), 'strike'])
-                if res.get('call_wall') is None:
-                    calls_above_oi = calls[calls['strike'] >= price * 0.98]
-                    if not calls_above_oi.empty:
-                        res['call_wall'] = float(calls_above_oi.loc[calls_above_oi['openInterest'].idxmax(), 'strike'])
-
-                if use_gex:
-                    puts_below = puts_g[puts_g['strike'] <= price * 1.02].copy()
-                    if not puts_below.empty:
-                        puts_below['abs_gex'] = puts_below['gex'].abs()
-                        if puts_below['abs_gex'].max() > 0:
-                            res['put_wall'] = float(puts_below.loc[puts_below['abs_gex'].idxmax(), 'strike'])
-                if res.get('put_wall') is None:
-                    puts_below_oi = puts[puts['strike'] <= price * 1.02]
-                    if not puts_below_oi.empty:
-                        res['put_wall'] = float(puts_below_oi.loc[puts_below_oi['openInterest'].idxmax(), 'strike'])
+                res = {'expiry': best}
+                puts_below = puts[puts['strike'] <= price * 1.02]
+                if not puts_below.empty:
+                    res['put_wall'] = float(puts_below.loc[puts_below['openInterest'].idxmax(), 'strike'])
+                calls_above = calls[calls['strike'] >= price * 0.98]
+                if not calls_above.empty:
+                    res['call_wall'] = float(calls_above.loc[calls_above['openInterest'].idxmax(), 'strike'])
+                res['max_pain'] = calc_max_pain(calls, puts, current_price=price)
+                return res, calls, puts
 
                 res['max_pain'] = calc_max_pain(calls, puts, current_price=price)
                 return res, calls, puts
@@ -1069,9 +971,9 @@ td{{padding:13px 14px;vertical-align:middle}}
   <span><span class="ivb ive">偏高</span> 50–75%</span>
   <span><span class="ivb ivh">極高</span> &gt;75%</span>
   <span>｜</span>
-  <span class="oi-call">▼ Call GΓ</span> = Gamma Wall 壓力（BS Gamma × OI 最大的上方 Strike）
+  <span class="oi-call">▼ Call Wall</span> = 壓力
   <span class="oi-pain">⚡ Max Pain</span> = 最大痛苦點
-  <span class="oi-put">▲ Put GΓ</span> = Gamma Wall 支撐（BS Gamma × OI 最大的下方 Strike）　｜　<span style="color:#e3b341">月結</span> = 當月第三週五
+  <span class="oi-put">▲ Put Wall</span> = 支撐　｜　<span style="color:#e3b341">月結</span> = 當月第三週五
   <span>｜</span>
   <span style="color:#a371f7">🎯↑</span> = 當週最強 OTM Call 押注目標（看多）　<span style="color:#79c0ff">🎯↓</span> = 當週最強 OTM Put 押注目標（看空/避險）
 
