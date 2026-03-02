@@ -97,18 +97,7 @@ td{padding:13px 14px;vertical-align:middle}
 .mkc-p{font-size:1.25em;font-weight:700;font-family:monospace;color:#e6edf3;text-align:right}
 .mkc-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
 .ftr{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:12px 18px;text-align:center;color:#484f58;font-size:0.7em;line-height:2;margin-top:14px}
-.flow-td{min-width:150px;max-width:170px;vertical-align:middle}
-.flow-badge{display:inline-block;font-size:0.75em;font-weight:700;border-radius:6px;padding:3px 8px;margin-bottom:5px;white-space:nowrap}
-.flow-call{background:rgba(63,185,80,.12);color:#3fb950;border:1px solid rgba(63,185,80,.3)}
-.flow-put{background:rgba(248,81,73,.12);color:#f85149;border:1px solid rgba(248,81,73,.3)}
-.flow-mix{background:rgba(210,153,34,.12);color:#d29922;border:1px solid rgba(210,153,34,.3)}
-.flow-neu{background:rgba(139,148,158,.08);color:#8b949e;border:1px solid rgba(139,148,158,.2)}
-.flow-row{display:flex;align-items:center;gap:5px;margin-bottom:2px}
-.flow-lbl{font-size:0.65em;color:#8b949e;min-width:42px;white-space:nowrap}
-.flow-bar-wrap{flex:1;background:#21262d;border-radius:2px;height:4px;overflow:hidden;min-width:30px}
-.flow-bar-c{display:block;height:100%;background:#3fb950;border-radius:2px}
-.flow-bar-p{display:block;height:100%;background:#f85149;border-radius:2px}
-.flow-val{font-family:monospace;font-size:0.72em;color:#c9d1d9;white-space:nowrap}
+
 </style>
 </head>
 <body>
@@ -117,7 +106,7 @@ td{padding:13px 14px;vertical-align:middle}
 <div class="hdr">
   <div>
     <h1>📊 美股每日開盤掃描報告</h1>
-    <div class="sub">Magnificent 7 + TSM · MU · SNDK · NFLX · AMD · AVGO · COST　｜　真實數據 yfinance　｜　晨星估值 · OI · IV · P/C Ratio · 機構流量</div>
+    <div class="sub">Magnificent 7 + TSM · MU · SNDK · NFLX · AMD · AVGO · COST　｜　真實數據 yfinance　｜　晨星估值 · OI · IV · P/C Ratio</div>
   </div>
   <div class="hdr-r">
     <div class="dt">2026年03月02日（週一）</div>
@@ -161,8 +150,7 @@ td{padding:13px 14px;vertical-align:middle}
   <div class="sc"><div class="l">最強漲幅</div><div class="v gu" style="font-size:1em">NFLX +13.77%</div></div>
   <div class="sc"><div class="l">整體 IV 水位</div><div class="v gmx">IVR≈46%</div></div>
   <div class="sc"><div class="l">掃描股票</div><div class="v gbl">14</div></div>
-  <div class="sc" style="min-width:160px"><div class="l">🟢 Call Sweep</div><div class="v" style="font-size:0.85em;color:#3fb950">NFLX</div></div>
-  <div class="sc" style="min-width:160px"><div class="l">🔴 Put Sweep</div><div class="v" style="font-size:0.85em;color:#f85149">—</div></div></div>
+</div>
 
 <div class="leg">
   <strong>期權欄位說明：</strong>
@@ -175,10 +163,7 @@ td{padding:13px 14px;vertical-align:middle}
   <span class="oi-pain">⚡ Max Pain</span> = 最大痛苦點
   <span class="oi-put">▲ Put Wall</span> = 支撐　｜　<span style="color:#e3b341">月結</span> = 當月第三週五
   <span>｜</span>
-  <strong style="color:#a371f7">機構流量：</strong>
-  <span class="flow-badge flow-call">🟢 Call Sweep</span> vol/OI &gt;0.5 且 Call 主導
-  <span class="flow-badge flow-put">🔴 Put Sweep</span> vol/OI &gt;0.5 且 Put 主導
-  <span class="flow-badge flow-mix">🟡 雙向異常</span> 雙側同時放量　｜　vol/OI &gt;1 = 今日新建倉超過歷史累積
+
 </div>
 
 <div class="stitle">📋 個股全覽</div>
@@ -189,7 +174,7 @@ td{padding:13px 14px;vertical-align:middle}
   <th rowspan="2">代碼</th>
   <th rowspan="2">現價</th>
   <th colspan="4" class="th-grp" style="color:#58a6ff;min-width:440px">── OI 支撐壓力（本週 / 下週 / 下下週 / 下下下週）──</th>
-  <th rowspan="2" class="th-grp" style="color:#a371f7;min-width:140px">── 機構流量 ──</th>
+
   <th rowspan="2">漲跌$</th>
   <th rowspan="2">漲跌%</th>
   <th rowspan="2">量比</th>
@@ -230,10 +215,6 @@ td{padding:13px 14px;vertical-align:middle}
 <div class="oi-call">▼ $285</div>
 <div class="oi-pain">⚡ $270</div>
 <div class="oi-put">▲ $260</div></td>
-  <td class="flow-td"><div class="flow-neu flow-badge">⚪ 無異常</div>
-<div class="flow-row"><span class="flow-lbl">C vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-c" style="width:15%"></span></span><span class="flow-val">0.30x</span></div>
-<div class="flow-row"><span class="flow-lbl">P vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-p" style="width:14%"></span></span><span class="flow-val">0.28x</span></div>
-<div class="flow-row" style="margin-top:3px"><span class="flow-lbl" style="color:#484f58">C191.0K/P96.2K</span><span class="flow-val" style="color:#3fb950">+$49.8K</span></div></td>
   <td class="neg">-8.77</td><td class="neg pct">-3.21%</td>
   <td><span class="vh">1.92x</span><span class="vb">放量</span></td>
   <td><div class="ms-fv">$260 <span class="ms-prem">▲2%溢</span></div>
@@ -267,10 +248,6 @@ td{padding:13px 14px;vertical-align:middle}
 <div class="oi-call">▼ $450</div>
 <div class="oi-pain">⚡ $400</div>
 <div class="oi-put">▲ $350</div></td>
-  <td class="flow-td"><div class="flow-neu flow-badge">⚪ 無異常</div>
-<div class="flow-row"><span class="flow-lbl">C vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-c" style="width:14%"></span></span><span class="flow-val">0.29x</span></div>
-<div class="flow-row"><span class="flow-lbl">P vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-p" style="width:43%"></span></span><span class="flow-val">0.87x</span></div>
-<div class="flow-row" style="margin-top:3px"><span class="flow-lbl" style="color:#484f58">C135.0K/P255.4K</span><span class="flow-val" style="color:#3fb950">+$81.6K</span></div></td>
   <td class="neg">-8.98</td><td class="neg pct">-2.24%</td>
   <td>1.32x</td>
   <td><div class="ms-fv">$600 <span class="ms-disc">▼35%折</span></div>
@@ -304,10 +281,6 @@ td{padding:13px 14px;vertical-align:middle}
 <div class="oi-call">▼ $200</div>
 <div class="oi-pain">⚡ $175</div>
 <div class="oi-put">▲ $170</div></td>
-  <td class="flow-td"><div class="flow-mix flow-badge">🟡 雙向異常</div>
-<div class="flow-row"><span class="flow-lbl">C vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-c" style="width:20%"></span></span><span class="flow-val">0.41x</span></div>
-<div class="flow-row"><span class="flow-lbl">P vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-p" style="width:22%"></span></span><span class="flow-val">0.44x</span></div>
-<div class="flow-row" style="margin-top:3px"><span class="flow-lbl" style="color:#484f58">C970.5K/P817.6K</span><span class="flow-val" style="color:#f85149">$520.3K</span></div></td>
   <td class="neg">-7.70</td><td class="neg pct">-4.16%</td>
   <td>1.30x</td>
   <td><div class="ms-fv">$232 <span class="ms-disc">▼24%折</span></div>
@@ -341,10 +314,6 @@ td{padding:13px 14px;vertical-align:middle}
 <div class="oi-call">▼ $225</div>
 <div class="oi-pain">⚡ $205</div>
 <div class="oi-put">▲ $160</div></td>
-  <td class="flow-td"><div class="flow-neu flow-badge">⚪ 無異常</div>
-<div class="flow-row"><span class="flow-lbl">C vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-c" style="width:11%"></span></span><span class="flow-val">0.22x</span></div>
-<div class="flow-row"><span class="flow-lbl">P vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-p" style="width:13%"></span></span><span class="flow-val">0.27x</span></div>
-<div class="flow-row" style="margin-top:3px"><span class="flow-lbl" style="color:#484f58">C138.0K/P105.1K</span><span class="flow-val" style="color:#3fb950">+$275.4K</span></div></td>
   <td class="pos">+2.08</td><td class="pos pct">+1.00%</td>
   <td>1.25x</td>
   <td><div class="ms-fv">$260 <span class="ms-disc">▼19%折</span></div>
@@ -378,10 +347,6 @@ td{padding:13px 14px;vertical-align:middle}
 <div class="oi-call">▼ $315</div>
 <div class="oi-pain">⚡ $305</div>
 <div class="oi-put">▲ $290</div></td>
-  <td class="flow-td"><div class="flow-neu flow-badge">⚪ 無異常</div>
-<div class="flow-row"><span class="flow-lbl">C vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-c" style="width:13%"></span></span><span class="flow-val">0.26x</span></div>
-<div class="flow-row"><span class="flow-lbl">P vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-p" style="width:7%"></span></span><span class="flow-val">0.15x</span></div>
-<div class="flow-row" style="margin-top:3px"><span class="flow-lbl" style="color:#484f58">C93.5K/P53.2K</span><span class="flow-val" style="color:#3fb950">+$215.7K</span></div></td>
   <td class="pos">+4.38</td><td class="pos pct">+1.42%</td>
   <td>1.44x</td>
   <td><div class="ms-fv">$340 <span class="ms-disc">▼8%折</span></div>
@@ -415,10 +380,6 @@ td{padding:13px 14px;vertical-align:middle}
 <div class="oi-call">▼ $690</div>
 <div class="oi-pain">⚡ $650</div>
 <div class="oi-put">▲ $575</div></td>
-  <td class="flow-td"><div class="flow-neu flow-badge">⚪ 無異常</div>
-<div class="flow-row"><span class="flow-lbl">C vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-c" style="width:14%"></span></span><span class="flow-val">0.28x</span></div>
-<div class="flow-row"><span class="flow-lbl">P vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-p" style="width:12%"></span></span><span class="flow-val">0.24x</span></div>
-<div class="flow-row" style="margin-top:3px"><span class="flow-lbl" style="color:#484f58">C77.5K/P46.6K</span><span class="flow-val" style="color:#3fb950">+$386.5K</span></div></td>
   <td class="neg">-8.83</td><td class="neg pct">-1.34%</td>
   <td><span class="vh">1.54x</span><span class="vb">放量</span></td>
   <td><div class="ms-fv">$850 <span class="ms-disc">▼24%折</span></div>
@@ -452,10 +413,6 @@ td{padding:13px 14px;vertical-align:middle}
 <div class="oi-call">▼ $435</div>
 <div class="oi-pain">⚡ $415</div>
 <div class="oi-put">▲ $400</div></td>
-  <td class="flow-td"><div class="flow-mix flow-badge">🟡 雙向異常</div>
-<div class="flow-row"><span class="flow-lbl">C vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-c" style="width:27%"></span></span><span class="flow-val">0.55x</span></div>
-<div class="flow-row"><span class="flow-lbl">P vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-p" style="width:24%"></span></span><span class="flow-val">0.48x</span></div>
-<div class="flow-row" style="margin-top:3px"><span class="flow-lbl" style="color:#484f58">C346.0K/P317.4K</span><span class="flow-val" style="color:#3fb950">+$129.9K</span></div></td>
   <td class="neg">-6.07</td><td class="neg pct">-1.49%</td>
   <td>0.96x</td>
   <td><div class="ms-fv">$400 <span class="ms-prem">▲1%溢</span></div>
@@ -489,10 +446,6 @@ td{padding:13px 14px;vertical-align:middle}
 <div class="oi-call">▼ $380</div>
 <div class="oi-pain">⚡ $375</div>
 <div class="oi-put">▲ $290</div></td>
-  <td class="flow-td"><div class="flow-neu flow-badge">⚪ 無異常</div>
-<div class="flow-row"><span class="flow-lbl">C vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-c" style="width:8%"></span></span><span class="flow-val">0.17x</span></div>
-<div class="flow-row"><span class="flow-lbl">P vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-p" style="width:8%"></span></span><span class="flow-val">0.17x</span></div>
-<div class="flow-row" style="margin-top:3px"><span class="flow-lbl" style="color:#484f58">C24.1K/P47.5K</span><span class="flow-val" style="color:#f85149">$20.3K</span></div></td>
   <td class="neg">-2.23</td><td class="neg pct">-0.59%</td>
   <td>0.76x</td>
   <td><div class="ms-fv">$428 <span class="ms-disc">▼12%折</span></div>
@@ -526,10 +479,6 @@ td{padding:13px 14px;vertical-align:middle}
 <div class="oi-call">▼ $450</div>
 <div class="oi-pain">⚡ $400</div>
 <div class="oi-put">▲ $40</div></td>
-  <td class="flow-td"><div class="flow-mix flow-badge">🟡 雙向異常</div>
-<div class="flow-row"><span class="flow-lbl">C vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-c" style="width:17%"></span></span><span class="flow-val">0.35x</span></div>
-<div class="flow-row"><span class="flow-lbl">P vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-p" style="width:17%"></span></span><span class="flow-val">0.34x</span></div>
-<div class="flow-row" style="margin-top:3px"><span class="flow-lbl" style="color:#484f58">C96.6K/P148.9K</span><span class="flow-val" style="color:#3fb950">+$694.6K</span></div></td>
   <td class="neg">-3.19</td><td class="neg pct">-0.77%</td>
   <td>0.94x</td>
   <td><div class="ms-fv">$115 <span class="ms-prem">▲259%溢</span></div>
@@ -563,10 +512,6 @@ td{padding:13px 14px;vertical-align:middle}
 <div class="oi-call">▼ $700</div>
 <div class="oi-pain">⚡ $640</div>
 <div class="oi-put">▲ $380</div></td>
-  <td class="flow-td"><div class="flow-mix flow-badge">🟡 雙向異常</div>
-<div class="flow-row"><span class="flow-lbl">C vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-c" style="width:20%"></span></span><span class="flow-val">0.40x</span></div>
-<div class="flow-row"><span class="flow-lbl">P vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-p" style="width:16%"></span></span><span class="flow-val">0.33x</span></div>
-<div class="flow-row" style="margin-top:3px"><span class="flow-lbl" style="color:#484f58">C29.8K/P28.9K</span><span class="flow-val" style="color:#f85149">$43.5K</span></div></td>
   <td class="neg">-16.54</td><td class="neg pct">-2.54%</td>
   <td>0.80x</td>
   <td><div class="ms-fv">$138 <span class="ms-prem">▲360%溢</span></div>
@@ -600,10 +545,6 @@ td{padding:13px 14px;vertical-align:middle}
 <div class="oi-call">▼ $100</div>
 <div class="oi-pain">⚡ $80</div>
 <div class="oi-put">▲ $75</div></td>
-  <td class="flow-td"><div class="flow-call flow-badge">🟢 Call Sweep</div>
-<div class="flow-row"><span class="flow-lbl">C vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-c" style="width:40%"></span></span><span class="flow-val">0.80x</span></div>
-<div class="flow-row"><span class="flow-lbl">P vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-p" style="width:31%"></span></span><span class="flow-val">0.63x</span></div>
-<div class="flow-row" style="margin-top:3px"><span class="flow-lbl" style="color:#484f58">C697.7K/P317.9K</span><span class="flow-val" style="color:#3fb950">+$1623.7K</span></div></td>
   <td class="pos">+11.65</td><td class="pos pct">+13.77%</td>
   <td><span class="vh">3.54x</span><span class="vb">放量</span></td>
   <td><div class="ms-fv">$79 <span class="ms-prem">▲22%溢</span></div>
@@ -637,10 +578,6 @@ td{padding:13px 14px;vertical-align:middle}
 <div class="oi-call">▼ $235</div>
 <div class="oi-pain">⚡ $205</div>
 <div class="oi-put">▲ $145</div></td>
-  <td class="flow-td"><div class="flow-mix flow-badge">🟡 雙向異常</div>
-<div class="flow-row"><span class="flow-lbl">C vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-c" style="width:15%"></span></span><span class="flow-val">0.31x</span></div>
-<div class="flow-row"><span class="flow-lbl">P vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-p" style="width:18%"></span></span><span class="flow-val">0.36x</span></div>
-<div class="flow-row" style="margin-top:3px"><span class="flow-lbl" style="color:#484f58">C126.9K/P187.3K</span><span class="flow-val" style="color:#f85149">$59.8K</span></div></td>
   <td class="neg">-3.47</td><td class="neg pct">-1.70%</td>
   <td>0.66x</td>
   <td><div class="ms-fv">$145 <span class="ms-prem">▲38%溢</span></div>
@@ -674,10 +611,6 @@ td{padding:13px 14px;vertical-align:middle}
 <div class="oi-call">▼ $400</div>
 <div class="oi-pain">⚡ $330</div>
 <div class="oi-put">▲ $280</div></td>
-  <td class="flow-td"><div class="flow-neu flow-badge">⚪ 無異常</div>
-<div class="flow-row"><span class="flow-lbl">C vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-c" style="width:10%"></span></span><span class="flow-val">0.20x</span></div>
-<div class="flow-row"><span class="flow-lbl">P vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-p" style="width:6%"></span></span><span class="flow-val">0.12x</span></div>
-<div class="flow-row" style="margin-top:3px"><span class="flow-lbl" style="color:#484f58">C63.0K/P28.6K</span><span class="flow-val" style="color:#3fb950">+$127.0K</span></div></td>
   <td class="neg">-2.15</td><td class="neg pct">-0.67%</td>
   <td>1.20x</td>
   <td><div class="ms-fv">$258 <span class="ms-prem">▲24%溢</span></div>
@@ -711,10 +644,6 @@ td{padding:13px 14px;vertical-align:middle}
 <div class="oi-call">▼ $1020</div>
 <div class="oi-pain">⚡ $950</div>
 <div class="oi-put">▲ $950</div></td>
-  <td class="flow-td"><div class="flow-neu flow-badge">⚪ 無異常</div>
-<div class="flow-row"><span class="flow-lbl">C vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-c" style="width:11%"></span></span><span class="flow-val">0.22x</span></div>
-<div class="flow-row"><span class="flow-lbl">P vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-p" style="width:10%"></span></span><span class="flow-val">0.21x</span></div>
-<div class="flow-row" style="margin-top:3px"><span class="flow-lbl" style="color:#484f58">C7.8K/P6.9K</span><span class="flow-val" style="color:#3fb950">+$89.5K</span></div></td>
   <td class="pos">+24.05</td><td class="pos pct">+2.44%</td>
   <td><span class="vh">2.41x</span><span class="vb">放量</span></td>
   <td><div class="ms-fv">$700 <span class="ms-prem">▲44%溢</span></div>
@@ -774,13 +703,7 @@ td{padding:13px 14px;vertical-align:middle}
 </div>
       </div>
     </div>
-    <div style="margin-top:10px;border-top:1px solid #21262d;padding-top:8px">
-      <div class="oi-lbl" style="margin-bottom:6px;letter-spacing:0.5px;color:#a371f7">機構流量（四週加總）</div>
-      <div class="flow-neu flow-badge">⚪ 無異常</div>
-<div class="flow-row"><span class="flow-lbl">C vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-c" style="width:15%"></span></span><span class="flow-val">0.30x</span></div>
-<div class="flow-row"><span class="flow-lbl">P vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-p" style="width:12%"></span></span><span class="flow-val">0.25x</span></div>
-<div class="flow-row" style="margin-top:3px"><span class="flow-lbl" style="color:#484f58">C415.9K/P729.7K</span><span class="flow-val" style="color:#f85149">$925.0K</span></div>
-    </div>
+
   </div>
   <div class="mkc">
     <div class="mkc-hdr">
@@ -821,20 +744,14 @@ td{padding:13px 14px;vertical-align:middle}
 </div>
       </div>
     </div>
-    <div style="margin-top:10px;border-top:1px solid #21262d;padding-top:8px">
-      <div class="oi-lbl" style="margin-bottom:6px;letter-spacing:0.5px;color:#a371f7">機構流量（四週加總）</div>
-      <div class="flow-neu flow-badge">⚪ 無異常</div>
-<div class="flow-row"><span class="flow-lbl">C vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-c" style="width:8%"></span></span><span class="flow-val">0.17x</span></div>
-<div class="flow-row"><span class="flow-lbl">P vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-p" style="width:10%"></span></span><span class="flow-val">0.20x</span></div>
-<div class="flow-row" style="margin-top:3px"><span class="flow-lbl" style="color:#484f58">C187.8K/P363.0K</span><span class="flow-val" style="color:#f85149">$1303.0K</span></div>
-    </div>
+
   </div>
 </div>
 
 <div class="ftr">
   ⚠️ 本報告數據來自 Yahoo Finance（yfinance），OI / Max Pain 為真實期權鏈計算，晨星估值為靜態手動更新。僅供參考，不構成投資建議。<br>
-  數據來源：Yahoo Finance · yfinance　｜　報告產生：2026-03-02 01:37 台灣時間<br>
-  <span style="color:#21262d">本機版 v5.0 · python3 stock_scan.py · 四週 OI · S5TW/S5FI · 機構流量偵測</span>
+  數據來源：Yahoo Finance · yfinance　｜　報告產生：2026-03-02 01:47 台灣時間<br>
+  <span style="color:#21262d">本機版 v5.0 · python3 stock_scan.py · 四週 OI · S5TW/S5FI</span>
 </div>
 
 </div>
