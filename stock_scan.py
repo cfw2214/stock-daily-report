@@ -50,25 +50,52 @@ OUTPUT_DIR = os.environ.get('OUTPUT_DIR', os.path.expanduser('~/Desktop'))
 #  工具函數
 # ═══════════════════════════════════════════════════════════════
 
-def get_weekly_expiry():
-    """找最近的週結到期日（下一個週五，至少 1 天後）"""
-    today = datetime.now()
-    days_to_friday = (4 - today.weekday()) % 7  # 0=Mon…4=Fri
+def get_four_weekly_expiries():
+    """取得本週、下週、下下週、下下下週的週五到期日，並標記是否為月結算週（當月第三個週五）"""
+    today = datetime.now().date()
+    days_to_friday = (4 - today.weekday()) % 7
     if days_to_friday == 0:
-        days_to_friday = 7  # 今天就是週五 → 找下週五
+        days_to_friday = 0  # 今天就是週五，算本週
+    this_friday = today + timedelta(days=days_to_friday)
+
+    results = []
+    for i in range(4):
+        friday = this_friday + timedelta(weeks=i)
+        label = ['本週', '下週', '下下週', '下下下週'][i]
+
+        # 判斷是否為當月第三個週五（月結算日）
+        y, m = friday.year, friday.month
+        first = datetime(y, m, 1).date()
+        first_fri = first + timedelta(days=(4 - first.weekday()) % 7)
+        third_fri = first_fri + timedelta(weeks=2)
+        is_monthly = (friday == third_fri)
+
+        results.append({
+            'label': label,
+            'date': friday.strftime('%Y-%m-%d'),
+            'is_monthly': is_monthly
+        })
+    return results
+
+
+def get_weekly_expiry():
+    """找最近的週結到期日（下一個週五，至少 1 天後）【舊版，保留相容性】"""
+    today = datetime.now()
+    days_to_friday = (4 - today.weekday()) % 7
+    if days_to_friday == 0:
+        days_to_friday = 7
     candidate = today + timedelta(days=days_to_friday)
     return candidate.strftime('%Y-%m-%d')
 
 
 def get_monthly_expiry():
-    """找最近的月結到期日（當月或下月第三個週五，至少 7 天後）"""
+    """找最近的月結到期日（當月或下月第三個週五）【舊版，保留相容性】"""
     today = datetime.now()
     for offset in range(3):
         m = today.month + offset
         y = today.year + (m - 1) // 12
         m = ((m - 1) % 12) + 1
         first = datetime(y, m, 1)
-        # 找第一個週五
         first_fri = first + timedelta(days=(4 - first.weekday()) % 7)
         third_fri = first_fri + timedelta(weeks=2)
         if (third_fri - today).days >= 7:
@@ -158,7 +185,8 @@ def fmt_pe(val):
 # ═══════════════════════════════════════════════════════════════
 
 def fetch_vix():
-    """抓取 VIX 數據"""
+    """抓取 VIX 數據 + S&P500 成份股站上 20日/50日均線比例"""
+    result = {'value': 18.5, 'change': 0.0, 'pct': 0.0, 's5tw': None, 's5fi': None}
     try:
         v = yf.Ticker('^VIX')
         hist = v.history(period='2d')
@@ -167,10 +195,43 @@ def fetch_vix():
             prev = round(hist['Close'].iloc[-2], 2)
             chg  = round(now - prev, 2)
             pct  = round(chg / prev * 100, 2)
-            return {'value': now, 'change': chg, 'pct': pct}
+            result.update({'value': now, 'change': chg, 'pct': pct})
     except Exception:
         pass
-    return {'value': 18.5, 'change': 0.0, 'pct': 0.0}
+
+    # $S5TW: S&P 500 Stocks Above 20-Day MA
+    try:
+        t = yf.Ticker('^SP500-20MA')  # 嘗試常見 ticker
+        h = t.history(period='2d')
+        if not h.empty:
+            result['s5tw'] = round(float(h['Close'].iloc[-1]), 1)
+    except Exception:
+        pass
+
+    # 若 ^SP500-20MA 取不到，試 $S5TW via alternative symbol
+    if result['s5tw'] is None:
+        for sym in ['$S5TW', 'S5TW']:
+            try:
+                t = yf.Ticker(sym)
+                h = t.history(period='2d')
+                if not h.empty:
+                    result['s5tw'] = round(float(h['Close'].iloc[-1]), 1)
+                    break
+            except Exception:
+                pass
+
+    # $S5FI: S&P 500 Stocks Above 50-Day MA
+    for sym in ['$S5FI', 'S5FI', '^SP500-50MA']:
+        try:
+            t = yf.Ticker(sym)
+            h = t.history(period='2d')
+            if not h.empty:
+                result['s5fi'] = round(float(h['Close'].iloc[-1]), 1)
+                break
+        except Exception:
+            pass
+
+    return result
 
 
 def fetch_stock(ticker):
@@ -211,15 +272,28 @@ def fetch_stock(ticker):
         d['pe_ttm'] = fmt_pe(info.get('trailingPE'))
         d['pe_fwd'] = fmt_pe(info.get('forwardPE'))
 
-        # 期權數據（週結 + 月結）
-        for pfx in ('wk', 'mo'):
-            d[f'{pfx}_expiry']    = None
-            d[f'{pfx}_put_wall']  = None
-            d[f'{pfx}_call_wall'] = None
-            d[f'{pfx}_max_pain']  = None
+        # 期權數據（四週：本週、下週、下下週、下下下週）
+        WEEK_KEYS = ['w0', 'w1', 'w2', 'w3']
+        for k in WEEK_KEYS:
+            d[f'{k}_expiry']    = None
+            d[f'{k}_put_wall']  = None
+            d[f'{k}_call_wall'] = None
+            d[f'{k}_max_pain']  = None
+            d[f'{k}_is_monthly'] = False
+            d[f'{k}_label']     = ''
         d['iv']       = None
         d['ivr']      = None
         d['pc_ratio'] = None
+        # 期權流量訊號（模擬 Barchart 流量法）
+        d['flow_signal']     = None   # 'CALL_SWEEP'|'PUT_SWEEP'|'NEUTRAL'|'MIXED'
+        d['flow_call_vol']   = None
+        d['flow_put_vol']    = None
+        d['flow_call_oi']    = None
+        d['flow_put_oi']     = None
+        d['flow_call_ratio'] = None   # vol/OI > 1 = 激進買方
+        d['flow_put_ratio']  = None
+        d['flow_premium']    = None   # 正=多頭錢流，負=空頭
+        d['flow_note']       = ''
 
         def _fetch_oi(target_expiry_str, available_dates):
             """通用：找最接近 target_expiry_str 的到期日並抓 OI。
@@ -253,49 +327,107 @@ def fetch_stock(ticker):
             return result, calls, puts  # 永遠回傳 3-tuple
 
         # 初始化 — 避免 NameError
-        wk_calls = None
-        mo_calls = None
-        mo_puts  = pd.DataFrame()
+        last_calls = None
+        last_puts  = pd.DataFrame()
 
         try:
             available = t.options
+            four_weeks = get_four_weekly_expiries()
 
-            # ── 週結 OI ─────────────────────────────
-            try:
-                wk_target = get_weekly_expiry()
-                res, wk_calls, wk_puts = _fetch_oi(wk_target, available)
-                d['wk_expiry']    = res.get('expiry')
-                d['wk_put_wall']  = res.get('put_wall')
-                d['wk_call_wall'] = res.get('call_wall')
-                d['wk_max_pain']  = res.get('max_pain')
-                print(f'    週結到期: {d["wk_expiry"]}  Put牆:{d["wk_put_wall"]}  Pain:{d["wk_max_pain"]}  Call牆:{d["wk_call_wall"]}')
-            except Exception as e:
-                print(f'    週結期權錯誤 {ticker}: {e}')
+            # ── 四週期權 OI ─────────────────────────────
+            for i, wk_info in enumerate(four_weeks):
+                k = WEEK_KEYS[i]
+                d[f'{k}_label']     = wk_info['label']
+                d[f'{k}_is_monthly'] = wk_info['is_monthly']
+                try:
+                    res, calls_df, puts_df = _fetch_oi(wk_info['date'], available)
+                    d[f'{k}_expiry']    = res.get('expiry')
+                    d[f'{k}_put_wall']  = res.get('put_wall')
+                    d[f'{k}_call_wall'] = res.get('call_wall')
+                    d[f'{k}_max_pain']  = res.get('max_pain')
+                    last_calls = calls_df
+                    last_puts  = puts_df
+                    monthly_note = '★月結' if wk_info['is_monthly'] else ''
+                    print(f'    {wk_info["label"]}{monthly_note} ({d[f"{k}_expiry"]})  Put牆:{d[f"{k}_put_wall"]}  Pain:{d[f"{k}_max_pain"]}  Call牆:{d[f"{k}_call_wall"]}')
 
-            # ── 月結 OI ─────────────────────────────
-            try:
-                mo_target = get_monthly_expiry()
-                res, mo_calls, mo_puts = _fetch_oi(mo_target, available)
-                d['mo_expiry']    = res.get('expiry')
-                d['mo_put_wall']  = res.get('put_wall')
-                d['mo_call_wall'] = res.get('call_wall')
-                d['mo_max_pain']  = res.get('max_pain')
-                print(f'    月結到期: {d["mo_expiry"]}  Put牆:{d["mo_put_wall"]}  Pain:{d["mo_max_pain"]}  Call牆:{d["mo_call_wall"]}')
-            except Exception as e:
-                print(f'    月結期權錯誤 {ticker}: {e}')
+                    # ── 流量訊號：用本週(w0)鏈計算 ──────────
+                    if i == 0:
+                        try:
+                            c_vol = pd.to_numeric(calls_df['volume'], errors='coerce').fillna(0)
+                            p_vol = pd.to_numeric(puts_df['volume'],  errors='coerce').fillna(0)
+                            c_oi  = pd.to_numeric(calls_df['openInterest'], errors='coerce').fillna(0)
+                            p_oi  = pd.to_numeric(puts_df['openInterest'],  errors='coerce').fillna(0)
 
-            # ── IV / IVR / P/C（優先用月結鏈，否則用週結鏈）─────────
-            ref_calls = mo_calls if mo_calls is not None else wk_calls
-            ref_puts  = mo_puts  if mo_calls is not None else (wk_puts if wk_calls is not None else pd.DataFrame())
-            if ref_calls is not None:
-                atm = ref_calls.iloc[(ref_calls['strike'] - price).abs().argsort()[:3]]
+                            total_cv = float(c_vol.sum())
+                            total_pv = float(p_vol.sum())
+                            total_coi = float(c_oi.sum())
+                            total_poi = float(p_oi.sum())
+
+                            d['flow_call_vol'] = int(total_cv)
+                            d['flow_put_vol']  = int(total_pv)
+                            d['flow_call_oi']  = int(total_coi)
+                            d['flow_put_oi']   = int(total_poi)
+
+                            # vol/OI 比（>1 = 今日成交量超過所有未平倉，強烈新建倉信號）
+                            d['flow_call_ratio'] = round(total_cv / total_coi, 2) if total_coi > 0 else None
+                            d['flow_put_ratio']  = round(total_pv / total_poi, 2) if total_poi > 0 else None
+
+                            # 估算 premium：call mid * vol - put mid * vol（近 ATM 5 檔）
+                            def atm_premium(df, vol_series):
+                                df = df.copy()
+                                df['mid'] = (pd.to_numeric(df.get('bid', 0), errors='coerce').fillna(0) +
+                                             pd.to_numeric(df.get('ask', 0), errors='coerce').fillna(0)) / 2
+                                df['vol'] = vol_series.values
+                                atm_idx = (df['strike'] - price).abs().argsort()[:5]
+                                atm = df.iloc[atm_idx]
+                                return float((atm['mid'] * atm['vol']).sum())
+
+                            call_prem = atm_premium(calls_df, c_vol)
+                            put_prem  = atm_premium(puts_df,  p_vol)
+                            d['flow_premium'] = round(call_prem - put_prem, 0)
+
+                            # 判斷訊號
+                            cr = d['flow_call_ratio'] or 0
+                            pr = d['flow_put_ratio']  or 0
+                            prem = d['flow_premium']  or 0
+
+                            THRESH = 0.5   # vol/OI 超過 0.5 視為異常活躍
+
+                            call_active = cr > THRESH
+                            put_active  = pr > THRESH
+                            call_dom    = total_cv > total_pv * 1.5
+                            put_dom     = total_pv > total_cv * 1.5
+
+                            if call_active and call_dom and prem > 0:
+                                d['flow_signal'] = 'CALL_SWEEP'
+                                d['flow_note']   = f'Call 掃單 (vol/OI={cr:.2f}，溢價 ${prem:,.0f})'
+                            elif put_active and put_dom and prem < 0:
+                                d['flow_signal'] = 'PUT_SWEEP'
+                                d['flow_note']   = f'Put 掃單 (vol/OI={pr:.2f}，溢價 ${abs(prem):,.0f})'
+                            elif call_active and put_active:
+                                d['flow_signal'] = 'MIXED'
+                                d['flow_note']   = f'雙向異常 (C={cr:.2f} P={pr:.2f})'
+                            else:
+                                d['flow_signal'] = 'NEUTRAL'
+                                d['flow_note']   = '無異常流量'
+
+                            print(f'    流量訊號: {d["flow_signal"]} | {d["flow_note"]}')
+                        except Exception as fe:
+                            print(f'    流量計算錯誤: {fe}')
+
+                except Exception as e:
+                    print(f'    {wk_info["label"]}期權錯誤 {ticker}: {e}')
+
+            # ── IV / IVR / P/C（用最近一週期鏈）─────────
+            if last_calls is not None:
+                atm = last_calls.iloc[(last_calls['strike'] - price).abs().argsort()[:3]]
                 iv_vals = pd.to_numeric(atm['impliedVolatility'], errors='coerce').dropna()
                 if not iv_vals.empty:
                     d['iv']  = round(float(iv_vals.mean()) * 100, 1)
                     d['ivr'] = calc_ivr(t, d['iv'])
 
-                cv = pd.to_numeric(ref_calls['volume'], errors='coerce').sum()
-                pv = pd.to_numeric(ref_puts['volume'],  errors='coerce').sum() if not ref_puts.empty else 0
+                cv = pd.to_numeric(last_calls['volume'], errors='coerce').sum()
+                pv = pd.to_numeric(last_puts['volume'],  errors='coerce').sum() if not last_puts.empty else 0
                 if cv and cv > 0:
                     d['pc_ratio'] = round(float(pv) / float(cv), 2)
 
@@ -311,8 +443,11 @@ def fetch_stock(ticker):
 
 
 def fetch_spy_qqq():
-    """抓取 SPY / QQQ 技術面數據"""
+    """抓取 SPY / QQQ 技術面數據 + 四週期權 OI & Max Pain"""
     result = {}
+    four_weeks = get_four_weekly_expiries()
+    WEEK_KEYS = ['w0', 'w1', 'w2', 'w3']
+
     for sym in ['SPY', 'QQQ']:
         try:
             t    = yf.Ticker(sym)
@@ -322,12 +457,61 @@ def fetch_spy_qqq():
             closes = hist['Close']
             price  = float(closes.iloc[-1])
             prev   = float(closes.iloc[-2])
-            result[sym] = {
+            entry = {
                 'price':      round(price, 2),
                 'change_pct': round((price - prev) / prev * 100, 2),
                 'ma50':       round(float(closes.rolling(50).mean().iloc[-1]), 2),
                 'ma200':      round(float(closes.rolling(200).mean().iloc[-1]), 2),
             }
+
+            # 初始化四週期權欄位
+            for k in WEEK_KEYS:
+                entry[f'{k}_expiry']     = None
+                entry[f'{k}_put_wall']   = None
+                entry[f'{k}_call_wall']  = None
+                entry[f'{k}_max_pain']   = None
+                entry[f'{k}_is_monthly'] = False
+                entry[f'{k}_label']      = ''
+
+            # 取得可用到期日
+            available = t.options
+
+            def _fetch_oi_etf(target_date_str):
+                if not available or not target_date_str:
+                    raise ValueError('無到期日')
+                target_dt = datetime.strptime(target_date_str, '%Y-%m-%d')
+                best = min(available, key=lambda e: abs((datetime.strptime(e, '%Y-%m-%d') - target_dt).days))
+                chain = t.option_chain(best)
+                calls = chain.calls.copy()
+                puts  = chain.puts.copy()
+                calls['openInterest'] = pd.to_numeric(calls['openInterest'], errors='coerce').fillna(0)
+                puts['openInterest']  = pd.to_numeric(puts['openInterest'],  errors='coerce').fillna(0)
+                res = {'expiry': best}
+                puts_below = puts[puts['strike'] <= price * 1.02]
+                if not puts_below.empty:
+                    res['put_wall'] = float(puts_below.loc[puts_below['openInterest'].idxmax(), 'strike'])
+                calls_above = calls[calls['strike'] >= price * 0.98]
+                if not calls_above.empty:
+                    res['call_wall'] = float(calls_above.loc[calls_above['openInterest'].idxmax(), 'strike'])
+                res['max_pain'] = calc_max_pain(calls, puts, current_price=price)
+                return res
+
+            for i, wk_info in enumerate(four_weeks):
+                k = WEEK_KEYS[i]
+                entry[f'{k}_label']      = wk_info['label']
+                entry[f'{k}_is_monthly'] = wk_info['is_monthly']
+                try:
+                    res = _fetch_oi_etf(wk_info['date'])
+                    entry[f'{k}_expiry']    = res.get('expiry')
+                    entry[f'{k}_put_wall']  = res.get('put_wall')
+                    entry[f'{k}_call_wall'] = res.get('call_wall')
+                    entry[f'{k}_max_pain']  = res.get('max_pain')
+                    mo_note = '★月結' if wk_info['is_monthly'] else ''
+                    print(f'    {sym} {wk_info["label"]}{mo_note} ({entry[f"{k}_expiry"]})  Put牆:{entry[f"{k}_put_wall"]}  Pain:{entry[f"{k}_max_pain"]}  Call牆:{entry[f"{k}_call_wall"]}')
+                except Exception as e:
+                    print(f'    {sym} {wk_info["label"]}期權錯誤: {e}')
+
+            result[sym] = entry
         except Exception:
             pass
     return result
@@ -400,6 +584,50 @@ def pc_html(pc):
     return f'<div class="{cls}">{pc}</div><div class="pc-l">{note}</div>'
 
 
+def flow_html(d):
+    """渲染期權流量訊號欄位"""
+    sig  = d.get('flow_signal')
+    note = d.get('flow_note', '')
+    cv   = d.get('flow_call_vol')
+    pv   = d.get('flow_put_vol')
+    cr   = d.get('flow_call_ratio')
+    pr   = d.get('flow_put_ratio')
+    prem = d.get('flow_premium')
+
+    if sig is None:
+        return '<div style="color:#484f58;font-size:0.75em">N/A</div>'
+
+    def fmt_k(v):
+        if v is None: return '—'
+        return f'{v/1000:.1f}K' if v >= 1000 else str(v)
+
+    def fmt_prem(v):
+        if v is None: return '—'
+        sign = '+' if v >= 0 else ''
+        return f'{sign}${abs(v)/1000:.1f}K' if abs(v) >= 1000 else f'{sign}${v:.0f}'
+
+    if sig == 'CALL_SWEEP':
+        badge_cls  = 'flow-call'
+        badge_text = '🟢 Call Sweep'
+    elif sig == 'PUT_SWEEP':
+        badge_cls  = 'flow-put'
+        badge_text = '🔴 Put Sweep'
+    elif sig == 'MIXED':
+        badge_cls  = 'flow-mix'
+        badge_text = '🟡 雙向異常'
+    else:
+        badge_cls  = 'flow-neu'
+        badge_text = '⚪ 無異常'
+
+    ratio_bar_c = min(int((cr or 0) / 2 * 100), 100)
+    ratio_bar_p = min(int((pr or 0) / 2 * 100), 100)
+
+    return f'''<div class="{badge_cls} flow-badge">{badge_text}</div>
+<div class="flow-row"><span class="flow-lbl">C vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-c" style="width:{ratio_bar_c}%"></span></span><span class="flow-val">{cr:.2f}x</span></div>
+<div class="flow-row"><span class="flow-lbl">P vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-p" style="width:{ratio_bar_p}%"></span></span><span class="flow-val">{pr:.2f}x</span></div>
+<div class="flow-row" style="margin-top:3px"><span class="flow-lbl" style="color:#484f58">C{fmt_k(cv)}/P{fmt_k(pv)}</span><span class="flow-val" style="color:{"#3fb950" if (prem or 0)>=0 else "#f85149"}">{fmt_prem(prem)}</span></div>''' if cr is not None and pr is not None else f'<div class="{badge_cls} flow-badge">{badge_text}</div><div style="font-size:0.7em;color:#484f58">{note}</div>'
+
+
 def ms_html(ticker, price):
     ms = MORNINGSTAR.get(ticker, {})
     if not ms:
@@ -427,22 +655,25 @@ def ms_html(ticker, price):
     <span class="{moat_cls}">{moat_txt}</span>'''
 
 
-def oi_html_single(d, pfx, label):
-    """單一到期期別的 OI 格，pfx='wk' 或 'mo'，label='週結'/'月結'"""
+def oi_html_single(d, pfx, label=''):
+    """單一到期期別的 OI 格，pfx='w0'~'w3'"""
     cw    = d.get(f'{pfx}_call_wall')
     mp    = d.get(f'{pfx}_max_pain')
     pw    = d.get(f'{pfx}_put_wall')
     exp   = d.get(f'{pfx}_expiry', '') or ''
-    price = d.get('price')
-    exp_short = exp[5:] if exp else label  # MM-DD
+    is_mo = d.get(f'{pfx}_is_monthly', False)
+    wk_label = d.get(f'{pfx}_label', label)
+    exp_short = exp[5:] if exp else wk_label  # MM-DD
 
     def fmt(v):
         return f'${v:g}' if v is not None else '—'
 
-    if cw is None and mp is None and pw is None:
-        return f'<div style="color:#484f58;font-size:0.75em">{label}<br>N/A</div>'
+    mo_badge = '<span style="font-size:0.65em;color:#e3b341;margin-left:3px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px">月結</span>' if is_mo else ''
 
-    return f'''<div class="oi-lbl">{exp_short}</div>
+    if cw is None and mp is None and pw is None:
+        return f'<div style="color:#484f58;font-size:0.75em">{wk_label}{mo_badge}<br>N/A</div>'
+
+    return f'''<div class="oi-lbl">{wk_label} {exp_short}{mo_badge}</div>
 <div class="oi-call">▼ {fmt(cw)}</div>
 <div class="oi-pain">⚡ {fmt(mp)}</div>
 <div class="oi-put">▲ {fmt(pw)}</div>'''
@@ -452,7 +683,7 @@ def stock_row(d):
     if not d.get('ok'):
         return f'''<tr>
   <td><div class="tk"><span class="tb">{d["ticker"]}</span>{"<span class='m7'>Mag 7</span>" if d["ticker"] in MAG7 else ""}</div></td>
-  <td colspan="14" style="color:#f85149;font-size:0.8em">⚠ 數據抓取失敗</td>
+  <td colspan="17" style="color:#f85149;font-size:0.8em">⚠ 數據抓取失敗</td>
 </tr>'''
 
     ticker  = d['ticker']
@@ -495,9 +726,14 @@ def stock_row(d):
     # P/C
     pc_h = pc_html(d['pc_ratio'])
 
-    # OI 雙欄
-    oi_wk_h = oi_html_single(d, 'wk', '週結')
-    oi_mo_h = oi_html_single(d, 'mo', '月結')
+    # OI 四欄
+    oi_w0_h = oi_html_single(d, 'w0')
+    oi_w1_h = oi_html_single(d, 'w1')
+    oi_w2_h = oi_html_single(d, 'w2')
+    oi_w3_h = oi_html_single(d, 'w3')
+
+    # 流量訊號
+    flow_h = flow_html(d)
 
     # Morningstar
     ms_h = ms_html(ticker, price)
@@ -510,8 +746,11 @@ def stock_row(d):
     return f'''<tr>
   <td><div class="tk"><span class="tb">{ticker}</span>{mag7_badge}</div></td>
   <td class="pr">${price:.2f}</td>
-  <td class="oi">{oi_wk_h}</td>
-  <td class="oi">{oi_mo_h}</td>
+  <td class="oi">{oi_w0_h}</td>
+  <td class="oi">{oi_w1_h}</td>
+  <td class="oi">{oi_w2_h}</td>
+  <td class="oi">{oi_w3_h}</td>
+  <td class="flow-td">{flow_h}</td>
   <td class="{chg_cls}">{chg_str}</td><td class="{chg_cls} pct">{pct_str}</td>
   <td>{vol_html}</td>
   <td>{ms_h}</td>
@@ -535,6 +774,14 @@ def summary_cards(stocks):
     iv_vals = [s['ivr'] for s in ok if s.get('ivr') is not None]
     avg_ivr = int(sum(iv_vals) / len(iv_vals)) if iv_vals else 0
     total = len(stocks)
+
+    # 流量統計
+    call_sweeps = [s['ticker'] for s in ok if s.get('flow_signal') == 'CALL_SWEEP']
+    put_sweeps  = [s['ticker'] for s in ok if s.get('flow_signal') == 'PUT_SWEEP']
+    mixed       = [s['ticker'] for s in ok if s.get('flow_signal') == 'MIXED']
+    flow_str  = ' '.join(call_sweeps) if call_sweeps else '—'
+    fput_str  = ' '.join(put_sweeps)  if put_sweeps  else '—'
+
     return f'''
   <div class="sc"><div class="l">上漲</div><div class="v gu">▲ {up}</div></div>
   <div class="sc"><div class="l">下跌</div><div class="v gd">▼ {down}</div></div>
@@ -542,7 +789,9 @@ def summary_cards(stocks):
   <div class="sc"><div class="l">市場情緒</div><div class="v gb">{"偏多 🟢" if up > down else "偏空 🔴" if down > up else "中性 ⚪"}</div></div>
   <div class="sc"><div class="l">最強漲幅</div><div class="v gu" style="font-size:1em">{best_str}</div></div>
   <div class="sc"><div class="l">整體 IV 水位</div><div class="v gmx">IVR≈{avg_ivr}%</div></div>
-  <div class="sc"><div class="l">掃描股票</div><div class="v gbl">{total}</div></div>'''
+  <div class="sc"><div class="l">掃描股票</div><div class="v gbl">{total}</div></div>
+  <div class="sc" style="min-width:160px"><div class="l">🟢 Call Sweep</div><div class="v" style="font-size:0.85em;color:#3fb950">{flow_str}</div></div>
+  <div class="sc" style="min-width:160px"><div class="l">🔴 Put Sweep</div><div class="v" style="font-size:0.85em;color:#f85149">{fput_str}</div></div>'''
 
 
 def vix_bar_pct(val):
@@ -565,6 +814,49 @@ def generate_report(stocks, vix, spy_qqq, date_str):
 
     spy_chg_cls = 'pos' if spy.get('change_pct', 0) >= 0 else 'neg'
     qqq_chg_cls = 'pos' if qqq.get('change_pct', 0) >= 0 else 'neg'
+
+    # S5TW / S5FI breadth display
+    def breadth_color(val):
+        if val is None:
+            return '#8b949e'
+        if val >= 70:
+            return '#3fb950'
+        if val >= 40:
+            return '#d29922'
+        return '#f85149'
+
+    s5tw_val = vix.get('s5tw')
+    s5fi_val = vix.get('s5fi')
+    s5tw_str = f'{s5tw_val:.1f}%' if s5tw_val is not None else 'N/A'
+    s5fi_str = f'{s5fi_val:.1f}%' if s5fi_val is not None else 'N/A'
+    s5tw_color = breadth_color(s5tw_val)
+    s5fi_color = breadth_color(s5fi_val)
+
+    # SPY / QQQ 四週 OI Grid HTML
+    def etf_oi_grid_html(etf_data):
+        WEEK_KEYS = ['w0', 'w1', 'w2', 'w3']
+        cells = []
+        for k in WEEK_KEYS:
+            lbl    = etf_data.get(f'{k}_label', '')
+            exp    = etf_data.get(f'{k}_expiry', '') or ''
+            is_mo  = etf_data.get(f'{k}_is_monthly', False)
+            cw     = etf_data.get(f'{k}_call_wall')
+            mp     = etf_data.get(f'{k}_max_pain')
+            pw     = etf_data.get(f'{k}_put_wall')
+            exp_short = exp[5:] if exp else ''
+            mo_badge  = '<span style="font-size:0.6em;color:#e3b341;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px;margin-left:2px">月結</span>' if is_mo else ''
+            fmt = lambda v: f'${v:g}' if v is not None else '—'
+            cell = f'''<div style="background:#21262d;border-radius:6px;padding:7px 10px">
+  <div class="oi-lbl">{lbl} {exp_short}{mo_badge}</div>
+  <div class="oi-call" style="font-size:0.85em">▼ {fmt(cw)}</div>
+  <div class="oi-pain" style="font-size:0.85em">⚡ {fmt(mp)}</div>
+  <div class="oi-put" style="font-size:0.85em">▲ {fmt(pw)}</div>
+</div>'''
+            cells.append(cell)
+        return '\n'.join(cells)
+
+    spy_oi_grid = etf_oi_grid_html(spy)
+    qqq_oi_grid = etf_oi_grid_html(qqq)
 
     now_tw = datetime.now().strftime('%Y-%m-%d %H:%M')
     weekday_map = {0:'一',1:'二',2:'三',3:'四',4:'五',5:'六',6:'日'}
@@ -670,6 +962,18 @@ td{{padding:13px 14px;vertical-align:middle}}
 .mkc-p{{font-size:1.25em;font-weight:700;font-family:monospace;color:#e6edf3;text-align:right}}
 .mkc-hdr{{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}}
 .ftr{{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:12px 18px;text-align:center;color:#484f58;font-size:0.7em;line-height:2;margin-top:14px}}
+.flow-td{{min-width:150px;max-width:170px;vertical-align:middle}}
+.flow-badge{{display:inline-block;font-size:0.75em;font-weight:700;border-radius:6px;padding:3px 8px;margin-bottom:5px;white-space:nowrap}}
+.flow-call{{background:rgba(63,185,80,.12);color:#3fb950;border:1px solid rgba(63,185,80,.3)}}
+.flow-put{{background:rgba(248,81,73,.12);color:#f85149;border:1px solid rgba(248,81,73,.3)}}
+.flow-mix{{background:rgba(210,153,34,.12);color:#d29922;border:1px solid rgba(210,153,34,.3)}}
+.flow-neu{{background:rgba(139,148,158,.08);color:#8b949e;border:1px solid rgba(139,148,158,.2)}}
+.flow-row{{display:flex;align-items:center;gap:5px;margin-bottom:2px}}
+.flow-lbl{{font-size:0.65em;color:#8b949e;min-width:42px;white-space:nowrap}}
+.flow-bar-wrap{{flex:1;background:#21262d;border-radius:2px;height:4px;overflow:hidden;min-width:30px}}
+.flow-bar-c{{display:block;height:100%;background:#3fb950;border-radius:2px}}
+.flow-bar-p{{display:block;height:100%;background:#f85149;border-radius:2px}}
+.flow-val{{font-family:monospace;font-size:0.72em;color:#c9d1d9;white-space:nowrap}}
 </style>
 </head>
 <body>
@@ -678,7 +982,7 @@ td{{padding:13px 14px;vertical-align:middle}}
 <div class="hdr">
   <div>
     <h1>📊 美股每日開盤掃描報告</h1>
-    <div class="sub">Magnificent 7 + TSM · MU · SNDK · NFLX · AMD · AVGO · COST　｜　真實數據 yfinance　｜　晨星估值 · OI · IV · P/C Ratio</div>
+    <div class="sub">Magnificent 7 + TSM · MU · SNDK · NFLX · AMD · AVGO · COST　｜　真實數據 yfinance　｜　晨星估值 · OI · IV · P/C Ratio · 機構流量</div>
   </div>
   <div class="hdr-r">
     <div class="dt">{display_date}</div>
@@ -692,6 +996,16 @@ td{{padding:13px 14px;vertical-align:middle}}
     <div style="display:flex;align-items:baseline;gap:10px">
       <div class="vix-val">{vix_val}</div>
       <div class="vix-chg">{vix_sign} {abs(vix_chg)} ({vix_pct:+.2f}%)</div>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;justify-content:center;gap:6px;min-width:160px;border-left:1px solid #30363d;padding-left:18px">
+    <div>
+      <div class="vix-lbl" style="margin-bottom:2px">站上20日均線 ($S5TW)</div>
+      <div style="font-size:1.3em;font-weight:700;font-family:monospace;color:{s5tw_color}">{s5tw_str}</div>
+    </div>
+    <div>
+      <div class="vix-lbl" style="margin-bottom:2px">站上50日均線 ($S5FI)</div>
+      <div style="font-size:1.3em;font-weight:700;font-family:monospace;color:{s5fi_color}">{s5fi_str}</div>
     </div>
   </div>
   <div class="vix-gauge">
@@ -714,8 +1028,13 @@ td{{padding:13px 14px;vertical-align:middle}}
   <span><span class="ivb ivh">極高</span> &gt;75%</span>
   <span>｜</span>
   <span class="oi-call">▼ Call Wall</span> = 壓力
-  <span class="oi-pain">⚡ Max Pain</span> = 最大痛苦點（真實計算）
-  <span class="oi-put">▲ Put Wall</span> = 支撐　｜　週結 = 最近週五到期　月結 = 當月第三個週五到期
+  <span class="oi-pain">⚡ Max Pain</span> = 最大痛苦點
+  <span class="oi-put">▲ Put Wall</span> = 支撐　｜　<span style="color:#e3b341">月結</span> = 當月第三週五
+  <span>｜</span>
+  <strong style="color:#a371f7">機構流量：</strong>
+  <span class="flow-badge flow-call">🟢 Call Sweep</span> vol/OI &gt;0.5 且 Call 主導
+  <span class="flow-badge flow-put">🔴 Put Sweep</span> vol/OI &gt;0.5 且 Put 主導
+  <span class="flow-badge flow-mix">🟡 雙向異常</span> 雙側同時放量　｜　vol/OI &gt;1 = 今日新建倉超過歷史累積
 </div>
 
 <div class="stitle">📋 個股全覽</div>
@@ -725,7 +1044,8 @@ td{{padding:13px 14px;vertical-align:middle}}
 <tr>
   <th rowspan="2">代碼</th>
   <th rowspan="2">現價</th>
-  <th colspan="2" class="th-grp" style="color:#58a6ff;min-width:220px">── OI 支撐壓力 ──</th>
+  <th colspan="4" class="th-grp" style="color:#58a6ff;min-width:440px">── OI 支撐壓力（本週 / 下週 / 下下週 / 下下下週）──</th>
+  <th rowspan="2" class="th-grp" style="color:#a371f7;min-width:140px">── 機構流量 ──</th>
   <th rowspan="2">漲跌$</th>
   <th rowspan="2">漲跌%</th>
   <th rowspan="2">量比</th>
@@ -738,8 +1058,10 @@ td{{padding:13px 14px;vertical-align:middle}}
   <th rowspan="2">市值</th>
 </tr>
 <tr>
-  <th style="color:#58a6ff;font-size:0.7em">週結 Wall</th>
-  <th style="color:#58a6ff;font-size:0.7em">月結 Wall</th>
+  <th style="color:#58a6ff;font-size:0.7em">本週 Wall</th>
+  <th style="color:#58a6ff;font-size:0.7em">下週 Wall</th>
+  <th style="color:#58a6ff;font-size:0.7em">下下週 Wall</th>
+  <th style="color:#58a6ff;font-size:0.7em">下下下週 Wall</th>
   <th>P/E TTM</th><th>Fwd P/E</th>
   <th>IV / IVR</th><th>IV狀態</th><th>P/C Ratio</th>
 </tr>
@@ -762,6 +1084,12 @@ td{{padding:13px 14px;vertical-align:middle}}
     </div>
     <div class="mkr"><span class="k">MA50</span><span class="v {"pos" if spy.get("price",0)>spy.get("ma50",0) else "neg"}">${spy.get("ma50","—")} {"▲ 站上" if spy.get("price",0)>spy.get("ma50",0) else "▼ 跌破"}</span></div>
     <div class="mkr"><span class="k">MA200</span><span class="v {"pos" if spy.get("price",0)>spy.get("ma200",0) else "neg"}">${spy.get("ma200","—")} {"▲ 站上" if spy.get("price",0)>spy.get("ma200",0) else "▼ 跌破"}</span></div>
+    <div style="margin-top:10px;border-top:1px solid #21262d;padding-top:10px">
+      <div class="oi-lbl" style="margin-bottom:6px;letter-spacing:0.5px">期權 OI — 四週展望</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        {spy_oi_grid}
+      </div>
+    </div>
   </div>
   <div class="mkc">
     <div class="mkc-hdr">
@@ -773,13 +1101,19 @@ td{{padding:13px 14px;vertical-align:middle}}
     </div>
     <div class="mkr"><span class="k">MA50</span><span class="v {"pos" if qqq.get("price",0)>qqq.get("ma50",0) else "neg"}">${qqq.get("ma50","—")} {"▲ 站上" if qqq.get("price",0)>qqq.get("ma50",0) else "▼ 跌破"}</span></div>
     <div class="mkr"><span class="k">MA200</span><span class="v {"pos" if qqq.get("price",0)>qqq.get("ma200",0) else "neg"}">${qqq.get("ma200","—")} {"▲ 站上" if qqq.get("price",0)>qqq.get("ma200",0) else "▼ 跌破"}</span></div>
+    <div style="margin-top:10px;border-top:1px solid #21262d;padding-top:10px">
+      <div class="oi-lbl" style="margin-bottom:6px;letter-spacing:0.5px">期權 OI — 四週展望</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        {qqq_oi_grid}
+      </div>
+    </div>
   </div>
 </div>
 
 <div class="ftr">
   ⚠️ 本報告數據來自 Yahoo Finance（yfinance），OI / Max Pain 為真實期權鏈計算，晨星估值為靜態手動更新。僅供參考，不構成投資建議。<br>
   數據來源：Yahoo Finance · yfinance　｜　報告產生：{now_tw} 台灣時間<br>
-  <span style="color:#21262d">本機版 v3.1 · python3 stock_scan_local.py · 週結+月結雙欄 OI</span>
+  <span style="color:#21262d">本機版 v5.0 · python3 stock_scan.py · 四週 OI · S5TW/S5FI · 機構流量偵測</span>
 </div>
 
 </div>
