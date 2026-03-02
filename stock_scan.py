@@ -18,8 +18,8 @@ from datetime import datetime, timedelta
 #  設定區 — 依需求修改
 # ═══════════════════════════════════════════════════════════════
 
-TICKERS = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'META', 'TSLA',
-           'TSM', 'MU', 'SNDK', 'NFLX', 'AMD', 'AVGO', 'COST']
+TICKERS = ['NVDA', 'GOOGL', 'AAPL', 'MSFT', 'AMZN', 'META', 'TSLA',
+           'TSM', 'MU', 'SNDK', 'NFLX', 'AMD', 'AVGO', 'LITE', 'COHR']
 
 MAG7 = {'AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'META', 'TSLA'}
 
@@ -38,7 +38,8 @@ MORNINGSTAR = {
     'NFLX':  {'fv': 79,   'stars': 3, 'moat': 'Narrow'},
     'AMD':   {'fv': 145,  'stars': 3, 'moat': 'Narrow'},
     'AVGO':  {'fv': 258,  'stars': 3, 'moat': 'Wide'},
-    'COST':  {'fv': 700,  'stars': 2, 'moat': 'Wide'},
+    'LITE':  {'fv': 85,   'stars': 3, 'moat': 'Narrow'},
+    'COHR':  {'fv': 90,   'stars': 3, 'moat': 'Narrow'},
 }
 
 # 輸出資料夾：預設桌面，有 Google Drive 請改為同步路徑
