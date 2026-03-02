@@ -124,29 +124,32 @@ def calc_max_pain(calls_df, puts_df, current_price=None):
     """計算 Max Pain：option writers 受益最多的 strike 價格。
     改進：
       1. 只計算現價 ±20% 以內的 strike（過濾遠 OTM 雜訊）
-      2. 過濾 OI < 50 口的 strike（低流動性）
+      2. 過濾 OI < 50 口的 strike（低流動性），若資料不足退回 OI >= 1
     """
     try:
         c = calls_df.copy()
         p = puts_df.copy()
 
-        # 過濾低 OI
-        c = c[c['openInterest'] >= 50]
-        p = p[p['openInterest'] >= 50]
-
-        # 過濾遠 OTM（現價 ±20%）
+        # 過濾遠 OTM（現價 ±20%）先做，縮小範圍
         if current_price and current_price > 0:
             lo = current_price * 0.80
             hi = current_price * 1.20
             c = c[(c['strike'] >= lo) & (c['strike'] <= hi)]
             p = p[(p['strike'] >= lo) & (p['strike'] <= hi)]
 
-        all_strikes = sorted(set(c['strike'].tolist() + p['strike'].tolist()))
+        # 過濾低 OI，若過濾後無資料則降低門檻
+        for min_oi in [50, 10, 1]:
+            c_f = c[c['openInterest'] >= min_oi]
+            p_f = p[p['openInterest'] >= min_oi]
+            all_strikes = sorted(set(c_f['strike'].tolist() + p_f['strike'].tolist()))
+            if all_strikes:
+                break
+
         if not all_strikes:
             return None
 
-        calls_map = dict(zip(c['strike'], c['openInterest'].fillna(0)))
-        puts_map  = dict(zip(p['strike'], p['openInterest'].fillna(0)))
+        calls_map = dict(zip(c_f['strike'], c_f['openInterest'].fillna(0)))
+        puts_map  = dict(zip(p_f['strike'], p_f['openInterest'].fillna(0)))
 
         min_pain = float('inf')
         max_pain_strike = all_strikes[len(all_strikes) // 2]
