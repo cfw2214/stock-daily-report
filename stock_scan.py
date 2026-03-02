@@ -103,6 +103,59 @@ def get_monthly_expiry():
     return None
 
 
+
+def calc_gex(calls_df, puts_df, current_price):
+    """計算 Gamma Exposure (GEX)。
+    GEX = Σ(Call OI × Call Gamma × 100 × S²) - Σ(Put OI × Put Gamma × 100 × S²)
+    用 Black-Scholes 近似 Gamma，IV 用 impliedVolatility 欄位，缺失時用 0.5 代替。
+    回傳以百萬為單位的數值，正值代表做市商 Long Gamma（穩定），負值代表 Short Gamma（放大波動）。
+    """
+    try:
+        import math as _math
+        S = current_price
+        if not S or S <= 0:
+            return None
+
+        def bs_gamma(S, K, T, sigma):
+            if T <= 0 or sigma <= 0:
+                return 0.0
+            try:
+                d1 = (_math.log(S / K) + 0.5 * sigma**2 * T) / (sigma * _math.sqrt(T))
+                return _math.exp(-0.5 * d1**2) / (_math.sqrt(2 * _math.pi) * S * sigma * _math.sqrt(T))
+            except Exception:
+                return 0.0
+
+        T = 5 / 252  # 預設剩餘時間約 5 個交易日
+
+        def side_gex(df):
+            total = 0.0
+            for _, row in df.iterrows():
+                K   = float(row.get('strike', 0) or 0)
+                oi  = float(row.get('openInterest', 0) or 0)
+                iv  = float(row.get('impliedVolatility', 0) or 0)
+                if K <= 0 or oi <= 0:
+                    continue
+                if iv <= 0:
+                    iv = 0.50  # 預設 IV
+                g = bs_gamma(S, K, T, iv)
+                total += oi * g * 100 * S * S
+            return total
+
+        c = calls_df.copy()
+        p = puts_df.copy()
+
+        # 只用現價 ±30% 範圍
+        lo, hi = S * 0.70, S * 1.30
+        c = c[(c['strike'] >= lo) & (c['strike'] <= hi)]
+        p = p[(p['strike'] >= lo) & (p['strike'] <= hi)]
+
+        call_gex = side_gex(c)
+        put_gex  = side_gex(p)
+        net_gex  = (call_gex - put_gex) / 1e6  # 單位：百萬
+        return round(net_gex, 1)
+    except Exception:
+        return None
+
 def calc_max_pain(calls_df, puts_df, current_price=None):
     """計算 Max Pain：option writers 受益最多的 strike 價格。
     只過濾現價 ±20% 以外的遠 OTM，不濾 OI（非交易時段 OI 常為 0）
@@ -179,8 +232,8 @@ def fmt_pe(val):
 # ═══════════════════════════════════════════════════════════════
 
 def fetch_vix():
-    """抓取 VIX 數據 + S&P500 成份股站上 20日/50日均線比例"""
-    result = {'value': 18.5, 'change': 0.0, 'pct': 0.0, 's5tw': None, 's5fi': None}
+    """抓取 VIX 數據"""
+    result = {'value': 18.5, 'change': 0.0, 'pct': 0.0}
     try:
         v = yf.Ticker('^VIX')
         hist = v.history(period='2d')
@@ -192,39 +245,6 @@ def fetch_vix():
             result.update({'value': now, 'change': chg, 'pct': pct})
     except Exception:
         pass
-
-    # $S5TW: S&P 500 Stocks Above 20-Day MA
-    try:
-        t = yf.Ticker('^SP500-20MA')  # 嘗試常見 ticker
-        h = t.history(period='2d')
-        if not h.empty:
-            result['s5tw'] = round(float(h['Close'].iloc[-1]), 1)
-    except Exception:
-        pass
-
-    # 若 ^SP500-20MA 取不到，試 $S5TW via alternative symbol
-    if result['s5tw'] is None:
-        for sym in ['$S5TW', 'S5TW']:
-            try:
-                t = yf.Ticker(sym)
-                h = t.history(period='2d')
-                if not h.empty:
-                    result['s5tw'] = round(float(h['Close'].iloc[-1]), 1)
-                    break
-            except Exception:
-                pass
-
-    # $S5FI: S&P 500 Stocks Above 50-Day MA
-    for sym in ['$S5FI', 'S5FI', '^SP500-50MA']:
-        try:
-            t = yf.Ticker(sym)
-            h = t.history(period='2d')
-            if not h.empty:
-                result['s5fi'] = round(float(h['Close'].iloc[-1]), 1)
-                break
-        except Exception:
-            pass
-
     return result
 
 
@@ -273,6 +293,7 @@ def fetch_stock(ticker):
             d[f'{k}_put_wall']  = None
             d[f'{k}_call_wall'] = None
             d[f'{k}_max_pain']  = None
+            d[f'{k}_gex']       = None
             d[f'{k}_is_monthly'] = False
             d[f'{k}_label']     = ''
         d['iv']       = None
@@ -335,6 +356,7 @@ def fetch_stock(ticker):
                     d[f'{k}_put_wall']  = res.get('put_wall')
                     d[f'{k}_call_wall'] = res.get('call_wall')
                     d[f'{k}_max_pain']  = res.get('max_pain')
+                    d[f'{k}_gex']       = calc_gex(calls_df, puts_df, price)
                     last_calls = calls_df
                     last_puts  = puts_df
                     monthly_note = '★月結' if wk_info['is_monthly'] else ''
@@ -618,6 +640,32 @@ def oi_html_single(d, pfx, label=''):
 <div class="oi-put">▲ {fmt(pw)}</div>'''
 
 
+
+def gex_html_single(d, pfx):
+    """單一週期的 GEX 格"""
+    gex = d.get(f'{pfx}_gex')
+    if gex is None:
+        return '<div style="color:#484f58;font-size:0.75em">GEX<br>N/A</div>'
+
+    # 顏色：正值(做市商Long Gamma)=綠，負值(Short Gamma)=紅
+    if gex >= 0:
+        color = '#3fb950'
+        arrow = '▲'
+        label = 'Long γ'
+    else:
+        color = '#f85149'
+        arrow = '▼'
+        label = 'Short γ'
+
+    abs_gex = abs(gex)
+    # 強度條（最大假設 5000M）
+    bar_pct = min(int(abs_gex / 5000 * 100), 100)
+
+    return f'''<div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:{color}">{arrow} ${abs_gex:,.0f}M</div>
+<div style="font-size:0.65em;color:{color};margin-bottom:3px">{label}</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:{color};height:4px;border-radius:2px;width:{bar_pct}%"></div></div>'''
+
 def stock_row(d):
     if not d.get('ok'):
         return f'''<tr>
@@ -670,6 +718,10 @@ def stock_row(d):
     oi_w1_h = oi_html_single(d, 'w1')
     oi_w2_h = oi_html_single(d, 'w2')
     oi_w3_h = oi_html_single(d, 'w3')
+    gex_w0_h = gex_html_single(d, 'w0')
+    gex_w1_h = gex_html_single(d, 'w1')
+    gex_w2_h = gex_html_single(d, 'w2')
+    gex_w3_h = gex_html_single(d, 'w3')
 
 
     # Morningstar
@@ -684,9 +736,13 @@ def stock_row(d):
   <td><div class="tk"><span class="tb">{ticker}</span>{mag7_badge}</div></td>
   <td class="pr">${price:.2f}</td>
   <td class="oi">{oi_w0_h}</td>
+  <td class="gex-td">{gex_w0_h}</td>
   <td class="oi">{oi_w1_h}</td>
+  <td class="gex-td">{gex_w1_h}</td>
   <td class="oi">{oi_w2_h}</td>
+  <td class="gex-td">{gex_w2_h}</td>
   <td class="oi">{oi_w3_h}</td>
+  <td class="gex-td">{gex_w3_h}</td>
   <td class="{chg_cls}">{chg_str}</td><td class="{chg_cls} pct">{pct_str}</td>
   <td>{vol_html}</td>
   <td>{ms_h}</td>
@@ -742,23 +798,6 @@ def generate_report(stocks, vix, spy_qqq, date_str):
 
     spy_chg_cls = 'pos' if spy.get('change_pct', 0) >= 0 else 'neg'
     qqq_chg_cls = 'pos' if qqq.get('change_pct', 0) >= 0 else 'neg'
-
-    # S5TW / S5FI breadth display
-    def breadth_color(val):
-        if val is None:
-            return '#8b949e'
-        if val >= 70:
-            return '#3fb950'
-        if val >= 40:
-            return '#d29922'
-        return '#f85149'
-
-    s5tw_val = vix.get('s5tw')
-    s5fi_val = vix.get('s5fi')
-    s5tw_str = f'{s5tw_val:.1f}%' if s5tw_val is not None else 'N/A'
-    s5fi_str = f'{s5fi_val:.1f}%' if s5fi_val is not None else 'N/A'
-    s5tw_color = breadth_color(s5tw_val)
-    s5fi_color = breadth_color(s5fi_val)
 
     # SPY / QQQ 四週 OI Grid HTML
     def etf_oi_grid_html(etf_data):
@@ -860,7 +899,7 @@ td{{padding:13px 14px;vertical-align:middle}}
 .ivr-f{{height:100%;border-radius:3px}}
 .ivrl{{background:#3fb950}}.ivrm{{background:#d29922}}.ivrh{{background:#f85149}}
 .ivr-lbl{{font-size:0.75em;color:#8b949e}}
-.oi{{min-width:110px;max-width:140px}}
+.oi{{min-width:110px;max-width:140px}}.gex-td{{min-width:90px;max-width:110px;border-left:1px dashed #21262d;vertical-align:middle}}
 .oi-lbl{{font-size:0.7em;color:#484f58;margin-bottom:3px;letter-spacing:0.5px;text-transform:uppercase}}
 .oi-call{{font-family:monospace;font-size:0.92em;color:#f85149;white-space:nowrap}}
 .oi-pain{{font-family:monospace;font-size:0.92em;color:#d29922;white-space:nowrap;margin:3px 0}}
@@ -920,16 +959,7 @@ td{{padding:13px 14px;vertical-align:middle}}
       <div class="vix-chg">{vix_sign} {abs(vix_chg)} ({vix_pct:+.2f}%)</div>
     </div>
   </div>
-  <div style="display:flex;flex-direction:column;justify-content:center;gap:6px;min-width:160px;border-left:1px solid #30363d;padding-left:18px">
-    <div>
-      <div class="vix-lbl" style="margin-bottom:2px">站上20日均線 ($S5TW)</div>
-      <div style="font-size:1.3em;font-weight:700;font-family:monospace;color:{s5tw_color}">{s5tw_str}</div>
-    </div>
-    <div>
-      <div class="vix-lbl" style="margin-bottom:2px">站上50日均線 ($S5FI)</div>
-      <div style="font-size:1.3em;font-weight:700;font-family:monospace;color:{s5fi_color}">{s5fi_str}</div>
-    </div>
-  </div>
+
   <div class="vix-gauge">
     <div class="vix-g-lbl"><span>極低 &lt;12</span><span>正常 12–20</span><span>警戒 20–30</span><span>恐慌 &gt;30</span></div>
     <div class="vix-bar"><div class="vix-dot" style="left:{vix_bar_pct(vix_val)}%"></div></div>
@@ -964,7 +994,7 @@ td{{padding:13px 14px;vertical-align:middle}}
 <tr>
   <th rowspan="2">代碼</th>
   <th rowspan="2">現價</th>
-  <th colspan="4" class="th-grp" style="color:#58a6ff;min-width:440px">── OI 支撐壓力（本週 / 下週 / 下下週 / 下下下週）──</th>
+  <th colspan="8" class="th-grp" style="color:#58a6ff;min-width:680px">── OI 支撐壓力 + GEX（本週 / 下週 / 下下週 / 下下下週）──</th>
 
   <th rowspan="2">漲跌$</th>
   <th rowspan="2">漲跌%</th>
@@ -978,10 +1008,14 @@ td{{padding:13px 14px;vertical-align:middle}}
   <th rowspan="2">市值</th>
 </tr>
 <tr>
-  <th style="color:#58a6ff;font-size:0.7em">本週 Wall</th>
-  <th style="color:#58a6ff;font-size:0.7em">下週 Wall</th>
-  <th style="color:#58a6ff;font-size:0.7em">下下週 Wall</th>
-  <th style="color:#58a6ff;font-size:0.7em">下下下週 Wall</th>
+  <th style="color:#58a6ff;font-size:0.7em">本週 OI</th>
+  <th style="color:#79c0ff;font-size:0.7em">本週 GEX</th>
+  <th style="color:#58a6ff;font-size:0.7em">下週 OI</th>
+  <th style="color:#79c0ff;font-size:0.7em">下週 GEX</th>
+  <th style="color:#58a6ff;font-size:0.7em">下下週 OI</th>
+  <th style="color:#79c0ff;font-size:0.7em">下下週 GEX</th>
+  <th style="color:#58a6ff;font-size:0.7em">下下下週 OI</th>
+  <th style="color:#79c0ff;font-size:0.7em">下下下週 GEX</th>
   <th>P/E TTM</th><th>Fwd P/E</th>
   <th>IV / IVR</th><th>IV狀態</th><th>P/C Ratio</th>
 </tr>
@@ -1035,7 +1069,7 @@ td{{padding:13px 14px;vertical-align:middle}}
 <div class="ftr">
   ⚠️ 本報告數據來自 Yahoo Finance（yfinance），OI / Max Pain 為真實期權鏈計算，晨星估值為靜態手動更新。僅供參考，不構成投資建議。<br>
   數據來源：Yahoo Finance · yfinance　｜　報告產生：{now_tw} 台灣時間<br>
-  <span style="color:#21262d">本機版 v5.0 · python3 stock_scan.py · 四週 OI · S5TW/S5FI</span>
+  <span style="color:#21262d">本機版 v5.0 · python3 stock_scan.py · 四週 OI + GEX</span>
 </div>
 
 </div>
