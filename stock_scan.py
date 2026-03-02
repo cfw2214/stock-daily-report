@@ -14,6 +14,23 @@ import os
 import sys
 from datetime import datetime, timedelta
 
+# Black-Scholes Gamma 計算（不需要 scipy，純 math）
+def _bs_gamma(S, K, T, sigma, r=0.045):
+    """
+    計算 Black-Scholes Gamma。
+    S = 現價, K = Strike, T = 到期年數, sigma = IV, r = 無風險利率
+    Call 和 Put 的 Gamma 相同。
+    """
+    if T <= 0 or sigma <= 0 or S <= 0 or K <= 0:
+        return 0.0
+    try:
+        d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * math.sqrt(T))
+        # 標準常態 PDF
+        phi = math.exp(-0.5 * d1 * d1) / math.sqrt(2 * math.pi)
+        return phi / (S * sigma * math.sqrt(T))
+    except Exception:
+        return 0.0
+
 # ═══════════════════════════════════════════════════════════════
 #  設定區 — 依需求修改
 # ═══════════════════════════════════════════════════════════════
@@ -306,15 +323,40 @@ def fetch_stock(ticker):
 
             result = {'expiry': best}
 
-            # Put Wall（現價以下 OI 最大的 Put strike）
-            puts_below = puts[puts['strike'] <= price * 1.02]
-            if not puts_below.empty:
-                result['put_wall'] = float(puts_below.loc[puts_below['openInterest'].idxmax(), 'strike'])
+            # 計算到期時間（年）
+            today = datetime.today()
+            expiry_dt = datetime.strptime(best, '%Y-%m-%d')
+            T = max((expiry_dt - today).days / 365.0, 1/365)
 
-            # Call Wall（現價以上 OI 最大的 Call strike）
-            calls_above = calls[calls['strike'] >= price * 0.98]
-            if not calls_above.empty:
-                result['call_wall'] = float(calls_above.loc[calls_above['openInterest'].idxmax(), 'strike'])
+            # ── Gamma Wall（取代 OI Wall）────────────────────
+            # 每個 Strike 的 GEX = Gamma(BS) × OI × 100
+            # Call GEX 正，Put GEX 負（做市商視角）
+            def add_gex(df, is_call):
+                df = df.copy()
+                df['iv']  = pd.to_numeric(df.get('impliedVolatility', 0), errors='coerce').fillna(0)
+                df['oi']  = pd.to_numeric(df['openInterest'], errors='coerce').fillna(0)
+                df['gamma'] = df.apply(
+                    lambda r: _bs_gamma(price, r['strike'], T, r['iv']), axis=1)
+                df['gex'] = df['gamma'] * df['oi'] * 100
+                if not is_call:
+                    df['gex'] = -df['gex']
+                return df
+
+            calls_g = add_gex(calls, is_call=True)
+            puts_g  = add_gex(puts,  is_call=False)
+
+            # Call Gamma Wall：現價以上，GEX 最大的 Strike（正 GEX 最大 = 最強壓力）
+            calls_above = calls_g[calls_g['strike'] >= price * 0.98]
+            if not calls_above.empty and calls_above['gex'].max() > 0:
+                result['call_wall'] = float(calls_above.loc[calls_above['gex'].idxmax(), 'strike'])
+
+            # Put Gamma Wall：現價以下，|GEX| 最大的 Strike（負 GEX 絕對值最大 = 最強支撐）
+            puts_below = puts_g[puts_g['strike'] <= price * 1.02]
+            if not puts_below.empty:
+                puts_below = puts_below.copy()
+                puts_below['abs_gex'] = puts_below['gex'].abs()
+                if puts_below['abs_gex'].max() > 0:
+                    result['put_wall'] = float(puts_below.loc[puts_below['abs_gex'].idxmax(), 'strike'])
 
             # Max Pain（傳入現價做範圍過濾）
             result['max_pain'] = calc_max_pain(calls, puts, current_price=price)
@@ -451,12 +493,34 @@ def fetch_spy_qqq():
                 calls['openInterest'] = pd.to_numeric(calls['openInterest'], errors='coerce').fillna(0)
                 puts['openInterest']  = pd.to_numeric(puts['openInterest'],  errors='coerce').fillna(0)
                 res = {'expiry': best}
-                puts_below = puts[puts['strike'] <= price * 1.02]
+
+                # 計算到期時間（年）
+                T = max((datetime.strptime(best, '%Y-%m-%d') - datetime.today()).days / 365.0, 1/365)
+
+                def add_gex_etf(df, is_call):
+                    df = df.copy()
+                    df['iv']    = pd.to_numeric(df.get('impliedVolatility', 0), errors='coerce').fillna(0)
+                    df['oi']    = pd.to_numeric(df['openInterest'], errors='coerce').fillna(0)
+                    df['gamma'] = df.apply(lambda r: _bs_gamma(price, r['strike'], T, r['iv']), axis=1)
+                    df['gex']   = df['gamma'] * df['oi'] * 100
+                    if not is_call:
+                        df['gex'] = -df['gex']
+                    return df
+
+                calls_g = add_gex_etf(calls, is_call=True)
+                puts_g  = add_gex_etf(puts,  is_call=False)
+
+                calls_above = calls_g[calls_g['strike'] >= price * 0.98]
+                if not calls_above.empty and calls_above['gex'].max() > 0:
+                    res['call_wall'] = float(calls_above.loc[calls_above['gex'].idxmax(), 'strike'])
+
+                puts_below = puts_g[puts_g['strike'] <= price * 1.02]
                 if not puts_below.empty:
-                    res['put_wall'] = float(puts_below.loc[puts_below['openInterest'].idxmax(), 'strike'])
-                calls_above = calls[calls['strike'] >= price * 0.98]
-                if not calls_above.empty:
-                    res['call_wall'] = float(calls_above.loc[calls_above['openInterest'].idxmax(), 'strike'])
+                    puts_below = puts_below.copy()
+                    puts_below['abs_gex'] = puts_below['gex'].abs()
+                    if puts_below['abs_gex'].max() > 0:
+                        res['put_wall'] = float(puts_below.loc[puts_below['abs_gex'].idxmax(), 'strike'])
+
                 res['max_pain'] = calc_max_pain(calls, puts, current_price=price)
                 return res, calls, puts
 
@@ -949,9 +1013,9 @@ td{{padding:13px 14px;vertical-align:middle}}
   <span><span class="ivb ive">偏高</span> 50–75%</span>
   <span><span class="ivb ivh">極高</span> &gt;75%</span>
   <span>｜</span>
-  <span class="oi-call">▼ Call Wall</span> = 壓力
+  <span class="oi-call">▼ Call GΓ</span> = Gamma Wall 壓力（BS Gamma × OI 最大的上方 Strike）
   <span class="oi-pain">⚡ Max Pain</span> = 最大痛苦點
-  <span class="oi-put">▲ Put Wall</span> = 支撐　｜　<span style="color:#e3b341">月結</span> = 當月第三週五
+  <span class="oi-put">▲ Put GΓ</span> = Gamma Wall 支撐（BS Gamma × OI 最大的下方 Strike）　｜　<span style="color:#e3b341">月結</span> = 當月第三週五
   <span>｜</span>
   <span style="color:#a371f7">🎯↑</span> = 當週最強 OTM Call 押注目標（看多）　<span style="color:#79c0ff">🎯↓</span> = 當週最強 OTM Put 押注目標（看空/避險）
 
