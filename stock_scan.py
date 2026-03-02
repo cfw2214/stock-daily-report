@@ -284,16 +284,6 @@ def fetch_stock(ticker):
         d['iv']       = None
         d['ivr']      = None
         d['pc_ratio'] = None
-        # 期權流量訊號（模擬 Barchart 流量法）
-        d['flow_signal']     = None   # 'CALL_SWEEP'|'PUT_SWEEP'|'NEUTRAL'|'MIXED'
-        d['flow_call_vol']   = None
-        d['flow_put_vol']    = None
-        d['flow_call_oi']    = None
-        d['flow_put_oi']     = None
-        d['flow_call_ratio'] = None   # vol/OI > 1 = 激進買方
-        d['flow_put_ratio']  = None
-        d['flow_premium']    = None   # 正=多頭錢流，負=空頭
-        d['flow_note']       = ''
 
         def _fetch_oi(target_expiry_str, available_dates):
             """通用：找最接近 target_expiry_str 的到期日並抓 OI。
@@ -330,9 +320,6 @@ def fetch_stock(ticker):
         last_calls = None
         last_puts  = pd.DataFrame()
 
-        # 四週累積流量用容器
-        all_calls_list = []
-        all_puts_list  = []
 
         try:
             available = t.options
@@ -354,82 +341,8 @@ def fetch_stock(ticker):
                     monthly_note = '★月結' if wk_info['is_monthly'] else ''
                     print(f'    {wk_info["label"]}{monthly_note} ({d[f"{k}_expiry"]})  Put牆:{d[f"{k}_put_wall"]}  Pain:{d[f"{k}_max_pain"]}  Call牆:{d[f"{k}_call_wall"]}')
 
-                    # 累積四週數據供流量計算
-                    all_calls_list.append(calls_df)
-                    all_puts_list.append(puts_df)
-
                 except Exception as e:
                     print(f'    {wk_info["label"]}期權錯誤 {ticker}: {e}')
-
-            # ── 流量訊號：四週全部加總計算 ──────────────────
-            if all_calls_list:
-                try:
-                    # 合併四週期權鏈
-                    all_calls = pd.concat(all_calls_list, ignore_index=True)
-                    all_puts  = pd.concat(all_puts_list,  ignore_index=True) if all_puts_list else pd.DataFrame()
-
-                    c_vol = pd.to_numeric(all_calls['volume'],       errors='coerce').fillna(0)
-                    p_vol = pd.to_numeric(all_puts['volume'],        errors='coerce').fillna(0) if not all_puts.empty else pd.Series([0])
-                    c_oi  = pd.to_numeric(all_calls['openInterest'], errors='coerce').fillna(0)
-                    p_oi  = pd.to_numeric(all_puts['openInterest'],  errors='coerce').fillna(0) if not all_puts.empty else pd.Series([0])
-
-                    total_cv  = float(c_vol.sum())
-                    total_pv  = float(p_vol.sum())
-                    total_coi = float(c_oi.sum())
-                    total_poi = float(p_oi.sum())
-
-                    d['flow_call_vol'] = int(total_cv)
-                    d['flow_put_vol']  = int(total_pv)
-                    d['flow_call_oi']  = int(total_coi)
-                    d['flow_put_oi']   = int(total_poi)
-
-                    # vol/OI 比（四週加總，>1 = 今日建倉超過歷史累積）
-                    d['flow_call_ratio'] = round(total_cv / total_coi, 2) if total_coi > 0 else None
-                    d['flow_put_ratio']  = round(total_pv / total_poi, 2) if total_poi > 0 else None
-
-                    # Premium 估算：全部到期日的 ATM ±10% 範圍內 mid × volume
-                    def calc_premium_allexp(df, vol_series):
-                        df = df.copy()
-                        df['mid'] = (pd.to_numeric(df.get('bid', 0), errors='coerce').fillna(0) +
-                                     pd.to_numeric(df.get('ask', 0), errors='coerce').fillna(0)) / 2
-                        df['vol'] = vol_series.values
-                        # 過濾現價 ±10% 範圍（排除極遠 OTM 噪音）
-                        in_range = (df['strike'] >= price * 0.90) & (df['strike'] <= price * 1.10)
-                        df = df[in_range]
-                        return float((df['mid'] * df['vol']).sum())
-
-                    call_prem = calc_premium_allexp(all_calls, c_vol)
-                    put_prem  = calc_premium_allexp(all_puts,  p_vol) if not all_puts.empty else 0.0
-                    d['flow_premium'] = round(call_prem - put_prem, 0)
-
-                    # 判斷訊號
-                    cr   = d['flow_call_ratio'] or 0
-                    pr   = d['flow_put_ratio']  or 0
-                    prem = d['flow_premium']    or 0
-
-                    # 閾值：四週合計 vol/OI > 0.3 就算異常（比單週標準寬鬆）
-                    THRESH    = 0.3
-                    call_active = cr > THRESH
-                    put_active  = pr > THRESH
-                    call_dom    = total_cv > total_pv * 1.5
-                    put_dom     = total_pv > total_cv * 1.5
-
-                    if call_active and call_dom and prem > 0:
-                        d['flow_signal'] = 'CALL_SWEEP'
-                        d['flow_note']   = f'Call 掃單 4週加總 (vol/OI={cr:.2f}，淨溢價 ${prem:,.0f})'
-                    elif put_active and put_dom and prem < 0:
-                        d['flow_signal'] = 'PUT_SWEEP'
-                        d['flow_note']   = f'Put 掃單 4週加總 (vol/OI={pr:.2f}，淨溢價 ${abs(prem):,.0f})'
-                    elif call_active and put_active:
-                        d['flow_signal'] = 'MIXED'
-                        d['flow_note']   = f'雙向異常 4週 (C={cr:.2f} P={pr:.2f})'
-                    else:
-                        d['flow_signal'] = 'NEUTRAL'
-                        d['flow_note']   = '無異常流量'
-
-                    print(f'    流量訊號(4週): {d["flow_signal"]} | {d["flow_note"]}')
-                except Exception as fe:
-                    print(f'    流量計算錯誤: {fe}')
 
             # ── IV / IVR / P/C（用最近一週期鏈）─────────
             if last_calls is not None:
@@ -475,14 +388,6 @@ def fetch_spy_qqq():
                 'change_pct': round((price - prev) / prev * 100, 2),
                 'ma50':       round(float(closes.rolling(50).mean().iloc[-1]), 2),
                 'ma200':      round(float(closes.rolling(200).mean().iloc[-1]), 2),
-                # 流量欄位
-                'flow_signal':     None,
-                'flow_call_vol':   None,
-                'flow_put_vol':    None,
-                'flow_call_ratio': None,
-                'flow_put_ratio':  None,
-                'flow_premium':    None,
-                'flow_note':       '',
             }
 
             # 初始化四週期權欄位
@@ -517,9 +422,6 @@ def fetch_spy_qqq():
                 res['max_pain'] = calc_max_pain(calls, puts, current_price=price)
                 return res, calls, puts
 
-            all_calls_list = []
-            all_puts_list  = []
-
             for i, wk_info in enumerate(four_weeks):
                 k = WEEK_KEYS[i]
                 entry[f'{k}_label']      = wk_info['label']
@@ -530,62 +432,10 @@ def fetch_spy_qqq():
                     entry[f'{k}_put_wall']  = res.get('put_wall')
                     entry[f'{k}_call_wall'] = res.get('call_wall')
                     entry[f'{k}_max_pain']  = res.get('max_pain')
-                    all_calls_list.append(calls_df)
-                    all_puts_list.append(puts_df)
                     mo_note = '★月結' if wk_info['is_monthly'] else ''
                     print(f'    {sym} {wk_info["label"]}{mo_note} ({entry[f"{k}_expiry"]})  Put牆:{entry[f"{k}_put_wall"]}  Pain:{entry[f"{k}_max_pain"]}  Call牆:{entry[f"{k}_call_wall"]}')
                 except Exception as e:
                     print(f'    {sym} {wk_info["label"]}期權錯誤: {e}')
-
-            # ── 四週流量加總 ──────────────────────────────
-            if all_calls_list:
-                try:
-                    ac = pd.concat(all_calls_list, ignore_index=True)
-                    ap = pd.concat(all_puts_list,  ignore_index=True) if all_puts_list else pd.DataFrame()
-
-                    c_vol = pd.to_numeric(ac['volume'],       errors='coerce').fillna(0)
-                    p_vol = pd.to_numeric(ap['volume'],       errors='coerce').fillna(0) if not ap.empty else pd.Series([0])
-                    c_oi  = pd.to_numeric(ac['openInterest'], errors='coerce').fillna(0)
-                    p_oi  = pd.to_numeric(ap['openInterest'], errors='coerce').fillna(0) if not ap.empty else pd.Series([0])
-
-                    tcv = float(c_vol.sum()); tpv = float(p_vol.sum())
-                    tco = float(c_oi.sum());  tpo = float(p_oi.sum())
-
-                    entry['flow_call_vol']   = int(tcv)
-                    entry['flow_put_vol']    = int(tpv)
-                    entry['flow_call_ratio'] = round(tcv / tco, 2) if tco > 0 else None
-                    entry['flow_put_ratio']  = round(tpv / tpo, 2) if tpo > 0 else None
-
-                    def etf_prem(df, vol_s):
-                        df = df.copy(); df['mid'] = (pd.to_numeric(df.get('bid',0),errors='coerce').fillna(0)+pd.to_numeric(df.get('ask',0),errors='coerce').fillna(0))/2
-                        df['vol'] = vol_s.values; rng = (df['strike']>=price*0.90)&(df['strike']<=price*1.10)
-                        return float((df[rng]['mid']*df[rng]['vol']).sum())
-
-                    cp = etf_prem(ac, c_vol)
-                    pp = etf_prem(ap, p_vol) if not ap.empty else 0.0
-                    entry['flow_premium'] = round(cp - pp, 0)
-
-                    cr = entry['flow_call_ratio'] or 0
-                    pr = entry['flow_put_ratio']  or 0
-                    prem = entry['flow_premium']  or 0
-                    THRESH = 0.3
-
-                    if cr > THRESH and tcv > tpv * 1.5 and prem > 0:
-                        entry['flow_signal'] = 'CALL_SWEEP'
-                        entry['flow_note']   = f'Call 掃單 4週 (vol/OI={cr:.2f}，淨溢價 ${prem:,.0f})'
-                    elif pr > THRESH and tpv > tcv * 1.5 and prem < 0:
-                        entry['flow_signal'] = 'PUT_SWEEP'
-                        entry['flow_note']   = f'Put 掃單 4週 (vol/OI={pr:.2f}，淨溢價 ${abs(prem):,.0f})'
-                    elif cr > THRESH and pr > THRESH:
-                        entry['flow_signal'] = 'MIXED'
-                        entry['flow_note']   = f'雙向異常 4週 (C={cr:.2f} P={pr:.2f})'
-                    else:
-                        entry['flow_signal'] = 'NEUTRAL'
-                        entry['flow_note']   = '無異常流量'
-
-                    print(f'    {sym} 流量訊號(4週): {entry["flow_signal"]} | {entry["flow_note"]}')
-                except Exception as fe:
-                    print(f'    {sym} 流量計算錯誤: {fe}')
 
             result[sym] = entry
         except Exception:
@@ -660,65 +510,6 @@ def pc_html(pc):
     return f'<div class="{cls}">{pc}</div><div class="pc-l">{note}</div>'
 
 
-def flow_html(d):
-    """渲染期權流量訊號欄位（含 tooltip 說明）"""
-    sig  = d.get('flow_signal')
-    note = d.get('flow_note', '')
-    cv   = d.get('flow_call_vol')
-    pv   = d.get('flow_put_vol')
-    cr   = d.get('flow_call_ratio')
-    pr   = d.get('flow_put_ratio')
-    prem = d.get('flow_premium')
-
-    if sig is None:
-        return '<div style="color:#484f58;font-size:0.75em">N/A</div>'
-
-    def fmt_k(v):
-        if v is None: return '—'
-        return f'{v/1000:.1f}K' if v >= 1000 else str(v)
-
-    def fmt_prem(v):
-        if v is None: return '—'
-        sign = '+' if v >= 0 else ''
-        return f'{sign}${abs(v)/1000:.1f}K' if abs(v) >= 1000 else f'{sign}${v:.0f}'
-
-    if sig == 'CALL_SWEEP':
-        badge_cls  = 'flow-call'
-        badge_text = '🟢 Call Sweep'
-        badge_tip  = '今天 Call 成交量異常放大，且買方花費的溢價高於 Put 方。代表有人在積極佈局看多倉位。'
-    elif sig == 'PUT_SWEEP':
-        badge_cls  = 'flow-put'
-        badge_text = '🔴 Put Sweep'
-        badge_tip  = '今天 Put 成交量異常放大，且買方花費的溢價高於 Call 方。代表有人在積極買入保護或押注下跌。'
-    elif sig == 'MIXED':
-        badge_cls  = 'flow-mix'
-        badge_text = '🟡 雙向異常'
-        badge_tip  = 'Call 與 Put 兩側今天都異常放量。可能是機構在做 Straddle（賭波動），方向不明，需觀察後續。'
-    else:
-        badge_cls  = 'flow-neu'
-        badge_text = '⚪ 無異常'
-        badge_tip  = '今天期權成交量相對於未平倉量處於正常水平，沒有偵測到明顯的大戶建倉行為。'
-
-    ratio_bar_c = min(int((cr or 0) / 2 * 100), 100)
-    ratio_bar_p = min(int((pr or 0) / 2 * 100), 100)
-
-    vol_oi_tip  = ('vol/OI 比率：今日成交量 ÷ 歷史未平倉量。'
-                   '0.1x = 正常冷清；0.3x+ = 開始異常；1.0x+ = 今天買的量等於所有歷史累積，極度罕見。'
-                   '進度條滿格 = 2.0x。綠色=Call熱，紅色=Put熱。')
-    vol_num_tip = ('C = 今日 Call 成交口數，P = 今日 Put 成交口數。K = 千口合約。'
-                   '數字越大、兩側差距越懸殊，訊號越清晰。')
-    prem_tip    = ('淨溢價 = Call買方花費 − Put買方花費（ATM附近±10%範圍）。'
-                   '正數(+) = 多頭錢流入；負數(-) = 空頭錢流入或機構在避險。'
-                   '金額越大代表押注越重，比口數更能反映真實意圖。')
-
-    prem_color = '#3fb950' if (prem or 0) >= 0 else '#f85149'
-
-    return f'''<div class="tip {badge_cls} flow-badge">{badge_text}<span class="tip-txt">{badge_tip}</span></div>
-<div class="tip flow-row"><span class="flow-lbl">C vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-c" style="width:{ratio_bar_c}%"></span></span><span class="flow-val">{f"{cr:.2f}x" if cr is not None else "—"}</span><span class="tip-txt">{vol_oi_tip}</span></div>
-<div class="tip flow-row"><span class="flow-lbl">P vol/OI</span><span class="flow-bar-wrap"><span class="flow-bar-p" style="width:{ratio_bar_p}%"></span></span><span class="flow-val">{f"{pr:.2f}x" if pr is not None else "—"}</span><span class="tip-txt">{vol_oi_tip}</span></div>
-<div class="tip flow-row" style="margin-top:3px"><span class="flow-lbl" style="color:#484f58">C{fmt_k(cv)}/P{fmt_k(pv)}</span><span class="flow-val" style="color:{prem_color}">{fmt_prem(prem)}</span><span class="tip-txt">{prem_tip}</span></div>''' if cr is not None and pr is not None else f'<div class="tip {badge_cls} flow-badge">{badge_text}<span class="tip-txt">{badge_tip}</span></div><div style="font-size:0.7em;color:#484f58">{note}</div>'
-
-
 def ms_html(ticker, price):
     ms = MORNINGSTAR.get(ticker, {})
     if not ms:
@@ -774,7 +565,7 @@ def stock_row(d):
     if not d.get('ok'):
         return f'''<tr>
   <td><div class="tk"><span class="tb">{d["ticker"]}</span>{"<span class='m7'>Mag 7</span>" if d["ticker"] in MAG7 else ""}</div></td>
-  <td colspan="17" style="color:#f85149;font-size:0.8em">⚠ 數據抓取失敗</td>
+  <td colspan="16" style="color:#f85149;font-size:0.8em">⚠ 數據抓取失敗</td>
 </tr>'''
 
     ticker  = d['ticker']
@@ -823,8 +614,6 @@ def stock_row(d):
     oi_w2_h = oi_html_single(d, 'w2')
     oi_w3_h = oi_html_single(d, 'w3')
 
-    # 流量訊號
-    flow_h = flow_html(d)
 
     # Morningstar
     ms_h = ms_html(ticker, price)
@@ -841,7 +630,6 @@ def stock_row(d):
   <td class="oi">{oi_w1_h}</td>
   <td class="oi">{oi_w2_h}</td>
   <td class="oi">{oi_w3_h}</td>
-  <td class="flow-td">{flow_h}</td>
   <td class="{chg_cls}">{chg_str}</td><td class="{chg_cls} pct">{pct_str}</td>
   <td>{vol_html}</td>
   <td>{ms_h}</td>
@@ -866,13 +654,6 @@ def summary_cards(stocks):
     avg_ivr = int(sum(iv_vals) / len(iv_vals)) if iv_vals else 0
     total = len(stocks)
 
-    # 流量統計
-    call_sweeps = [s['ticker'] for s in ok if s.get('flow_signal') == 'CALL_SWEEP']
-    put_sweeps  = [s['ticker'] for s in ok if s.get('flow_signal') == 'PUT_SWEEP']
-    mixed       = [s['ticker'] for s in ok if s.get('flow_signal') == 'MIXED']
-    flow_str  = ' '.join(call_sweeps) if call_sweeps else '—'
-    fput_str  = ' '.join(put_sweeps)  if put_sweeps  else '—'
-
     return f'''
   <div class="sc"><div class="l">上漲</div><div class="v gu">▲ {up}</div></div>
   <div class="sc"><div class="l">下跌</div><div class="v gd">▼ {down}</div></div>
@@ -881,8 +662,7 @@ def summary_cards(stocks):
   <div class="sc"><div class="l">最強漲幅</div><div class="v gu" style="font-size:1em">{best_str}</div></div>
   <div class="sc"><div class="l">整體 IV 水位</div><div class="v gmx">IVR≈{avg_ivr}%</div></div>
   <div class="sc"><div class="l">掃描股票</div><div class="v gbl">{total}</div></div>
-  <div class="sc" style="min-width:160px"><div class="l">🟢 Call Sweep</div><div class="v" style="font-size:0.85em;color:#3fb950">{flow_str}</div></div>
-  <div class="sc" style="min-width:160px"><div class="l">🔴 Put Sweep</div><div class="v" style="font-size:0.85em;color:#f85149">{fput_str}</div></div>'''
+'''
 
 
 def vix_bar_pct(val):
@@ -949,8 +729,6 @@ def generate_report(stocks, vix, spy_qqq, date_str):
     spy_oi_grid = etf_oi_grid_html(spy)
     qqq_oi_grid = etf_oi_grid_html(qqq)
 
-    spy_flow_html = flow_html(spy)
-    qqq_flow_html = flow_html(qqq)
 
     now_tw = datetime.now().strftime('%Y-%m-%d %H:%M')
     weekday_map = {0:'一',1:'二',2:'三',3:'四',4:'五',5:'六',6:'日'}
@@ -1056,22 +834,7 @@ td{{padding:13px 14px;vertical-align:middle}}
 .mkc-p{{font-size:1.25em;font-weight:700;font-family:monospace;color:#e6edf3;text-align:right}}
 .mkc-hdr{{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}}
 .ftr{{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:12px 18px;text-align:center;color:#484f58;font-size:0.7em;line-height:2;margin-top:14px}}
-.flow-td{{min-width:150px;max-width:170px;vertical-align:middle}}
-.flow-badge{{display:inline-block;font-size:0.75em;font-weight:700;border-radius:6px;padding:3px 8px;margin-bottom:5px;white-space:nowrap}}
-.flow-call{{background:rgba(63,185,80,.12);color:#3fb950;border:1px solid rgba(63,185,80,.3)}}
-.flow-put{{background:rgba(248,81,73,.12);color:#f85149;border:1px solid rgba(248,81,73,.3)}}
-.flow-mix{{background:rgba(210,153,34,.12);color:#d29922;border:1px solid rgba(210,153,34,.3)}}
-.flow-neu{{background:rgba(139,148,158,.08);color:#8b949e;border:1px solid rgba(139,148,158,.2)}}
-.flow-row{{display:flex;align-items:center;gap:5px;margin-bottom:2px}}
-.flow-lbl{{font-size:0.65em;color:#8b949e;min-width:42px;white-space:nowrap}}
-.flow-bar-wrap{{flex:1;background:#21262d;border-radius:2px;height:4px;overflow:hidden;min-width:30px}}
-.flow-bar-c{{display:block;height:100%;background:#3fb950;border-radius:2px}}
-.flow-bar-p{{display:block;height:100%;background:#f85149;border-radius:2px}}
-.flow-val{{font-family:monospace;font-size:0.72em;color:#c9d1d9;white-space:nowrap}}
-.tip{{position:relative;display:inline-block;cursor:help}}
-.tip .tip-txt{{visibility:hidden;opacity:0;background:#1c2128;color:#c9d1d9;font-size:0.72em;line-height:1.6;border:1px solid #444c56;border-radius:8px;padding:10px 13px;width:260px;position:absolute;z-index:999;bottom:130%;left:50%;transform:translateX(-50%);transition:opacity .18s;pointer-events:none;white-space:normal;font-weight:400;box-shadow:0 4px 16px rgba(0,0,0,.5)}}
-.tip:hover .tip-txt{{visibility:visible;opacity:1}}
-.tip-icon{{font-size:0.7em;color:#484f58;margin-left:3px;vertical-align:middle}}
+
 </style>
 </head>
 <body>
@@ -1080,7 +843,7 @@ td{{padding:13px 14px;vertical-align:middle}}
 <div class="hdr">
   <div>
     <h1>📊 美股每日開盤掃描報告</h1>
-    <div class="sub">Magnificent 7 + TSM · MU · SNDK · NFLX · AMD · AVGO · COST　｜　真實數據 yfinance　｜　晨星估值 · OI · IV · P/C Ratio · 機構流量</div>
+    <div class="sub">Magnificent 7 + TSM · MU · SNDK · NFLX · AMD · AVGO · COST　｜　真實數據 yfinance　｜　晨星估值 · OI · IV · P/C Ratio</div>
   </div>
   <div class="hdr-r">
     <div class="dt">{display_date}</div>
@@ -1129,20 +892,7 @@ td{{padding:13px 14px;vertical-align:middle}}
   <span class="oi-pain">⚡ Max Pain</span> = 最大痛苦點
   <span class="oi-put">▲ Put Wall</span> = 支撐　｜　<span style="color:#e3b341">月結</span> = 當月第三週五
   <span>｜</span>
-  <strong style="color:#a371f7">機構流量：</strong>
-  <span class="flow-badge flow-call">🟢 Call Sweep</span> vol/OI &gt;0.3 且 Call 主導
-  <span class="flow-badge flow-put">🔴 Put Sweep</span> vol/OI &gt;0.3 且 Put 主導
-  <span class="flow-badge flow-mix">🟡 雙向異常</span> 雙側同時放量
-  <span class="tip" style="cursor:help">　<span style="color:#a371f7">❓ 什麼是 vol/OI？</span><span class="tip-txt" style="left:0;transform:none;width:300px">
-    vol = 今日成交量（今天新增的交易）<br>
-    OI = 未平倉量（歷史累積的倉位）<br><br>
-    比值代表今天有多積極：<br>
-    0.1x = 正常冷清<br>
-    0.3x+ = 開始異常，有人在建倉<br>
-    1.0x+ = 今天買的量超過歷史所有累積，極罕見<br><br>
-    淨溢價 = Call買方花費 − Put買方花費<br>
-    正數 = 多頭錢流入　負數 = 空頭錢流入
-  </span></span>
+
 </div>
 
 <div class="stitle">📋 個股全覽</div>
@@ -1153,16 +903,7 @@ td{{padding:13px 14px;vertical-align:middle}}
   <th rowspan="2">代碼</th>
   <th rowspan="2">現價</th>
   <th colspan="4" class="th-grp" style="color:#58a6ff;min-width:440px">── OI 支撐壓力（本週 / 下週 / 下下週 / 下下下週）──</th>
-  <th rowspan="2" class="th-grp" style="color:#a371f7;min-width:140px">
-    <span class="tip">── 機構流量 ──<span class="tip-txt" style="font-size:0.85em;left:0;transform:none">
-      模擬 Barchart 流量法，掃描四週期權加總。<br>
-      🟢 Call Sweep = 今天大量新買 Call，看多訊號<br>
-      🔴 Put Sweep = 今天大量新買 Put，避險或看空<br>
-      🟡 雙向異常 = 兩側都放量，方向不明<br>
-      ⚪ 無異常 = 今天流量正常<br><br>
-      滑鼠移到各數字上可看詳細說明。
-    </span></span>
-  </th>
+
   <th rowspan="2">漲跌$</th>
   <th rowspan="2">漲跌%</th>
   <th rowspan="2">量比</th>
@@ -1207,10 +948,7 @@ td{{padding:13px 14px;vertical-align:middle}}
         {spy_oi_grid}
       </div>
     </div>
-    <div style="margin-top:10px;border-top:1px solid #21262d;padding-top:8px">
-      <div class="oi-lbl" style="margin-bottom:6px;letter-spacing:0.5px;color:#a371f7">機構流量（四週加總）</div>
-      {spy_flow_html}
-    </div>
+
   </div>
   <div class="mkc">
     <div class="mkc-hdr">
@@ -1228,17 +966,14 @@ td{{padding:13px 14px;vertical-align:middle}}
         {qqq_oi_grid}
       </div>
     </div>
-    <div style="margin-top:10px;border-top:1px solid #21262d;padding-top:8px">
-      <div class="oi-lbl" style="margin-bottom:6px;letter-spacing:0.5px;color:#a371f7">機構流量（四週加總）</div>
-      {qqq_flow_html}
-    </div>
+
   </div>
 </div>
 
 <div class="ftr">
   ⚠️ 本報告數據來自 Yahoo Finance（yfinance），OI / Max Pain 為真實期權鏈計算，晨星估值為靜態手動更新。僅供參考，不構成投資建議。<br>
   數據來源：Yahoo Finance · yfinance　｜　報告產生：{now_tw} 台灣時間<br>
-  <span style="color:#21262d">本機版 v5.0 · python3 stock_scan.py · 四週 OI · S5TW/S5FI · 機構流量偵測</span>
+  <span style="color:#21262d">本機版 v5.0 · python3 stock_scan.py · 四週 OI · S5TW/S5FI</span>
 </div>
 
 </div>
