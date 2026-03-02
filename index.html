@@ -66,7 +66,7 @@ td{padding:13px 14px;vertical-align:middle}
 .ivr-f{height:100%;border-radius:3px}
 .ivrl{background:#3fb950}.ivrm{background:#d29922}.ivrh{background:#f85149}
 .ivr-lbl{font-size:0.75em;color:#8b949e}
-.oi{min-width:110px;max-width:140px}
+.oi{min-width:110px;max-width:140px}.gex-td{min-width:90px;max-width:110px;border-left:1px dashed #21262d;vertical-align:middle}
 .oi-lbl{font-size:0.7em;color:#484f58;margin-bottom:3px;letter-spacing:0.5px;text-transform:uppercase}
 .oi-call{font-family:monospace;font-size:0.92em;color:#f85149;white-space:nowrap}
 .oi-pain{font-family:monospace;font-size:0.92em;color:#d29922;white-space:nowrap;margin:3px 0}
@@ -122,26 +122,17 @@ td{padding:13px 14px;vertical-align:middle}
   <div>
     <div class="vix-lbl">恐慌指數 VIX</div>
     <div style="display:flex;align-items:baseline;gap:10px">
-      <div class="vix-val">23.59</div>
-      <div class="vix-chg">▲ 3.73 (+18.78%)</div>
+      <div class="vix-val">23.4</div>
+      <div class="vix-chg">▲ 3.54 (+17.82%)</div>
     </div>
   </div>
-  <div style="display:flex;flex-direction:column;justify-content:center;gap:6px;min-width:160px;border-left:1px solid #30363d;padding-left:18px">
-    <div>
-      <div class="vix-lbl" style="margin-bottom:2px">站上20日均線 ($S5TW)</div>
-      <div style="font-size:1.3em;font-weight:700;font-family:monospace;color:#8b949e">N/A</div>
-    </div>
-    <div>
-      <div class="vix-lbl" style="margin-bottom:2px">站上50日均線 ($S5FI)</div>
-      <div style="font-size:1.3em;font-weight:700;font-family:monospace;color:#8b949e">N/A</div>
-    </div>
-  </div>
+
   <div class="vix-gauge">
     <div class="vix-g-lbl"><span>極低 &lt;12</span><span>正常 12–20</span><span>警戒 20–30</span><span>恐慌 &gt;30</span></div>
     <div class="vix-bar"><div class="vix-dot" style="left:58%"></div></div>
   </div>
   <div class="vix-ctx">
-    <strong>警戒 ⚠</strong>　VIX 23.59
+    <strong>警戒 ⚠</strong>　VIX 23.4
     進入警戒區間，市場波動加劇，留意風險。
   </div>
 </div>
@@ -151,7 +142,7 @@ td{padding:13px 14px;vertical-align:middle}
   <div class="sc"><div class="l">下跌</div><div class="v gd">▼ 10</div></div>
   <div class="sc"><div class="l">數據不完整</div><div class="v gf">— 0</div></div>
   <div class="sc"><div class="l">市場情緒</div><div class="v gb">偏空 🔴</div></div>
-  <div class="sc"><div class="l">最強漲幅</div><div class="v gu" style="font-size:1em">NFLX +13.77%</div></div>
+  <div class="sc"><div class="l">最強漲幅</div><div class="v gu" style="font-size:1em">NVDA +1.35%</div></div>
   <div class="sc"><div class="l">整體 IV 水位</div><div class="v gmx">IVR≈0%</div></div>
   <div class="sc"><div class="l">掃描股票</div><div class="v gbl">14</div></div>
 </div>
@@ -178,7 +169,7 @@ td{padding:13px 14px;vertical-align:middle}
 <tr>
   <th rowspan="2">代碼</th>
   <th rowspan="2">現價</th>
-  <th colspan="4" class="th-grp" style="color:#58a6ff;min-width:440px">── OI 支撐壓力（本週 / 下週 / 下下週 / 下下下週）──</th>
+  <th colspan="8" class="th-grp" style="color:#58a6ff;min-width:680px">── OI 支撐壓力 + GEX（本週 / 下週 / 下下週 / 下下下週）──</th>
 
   <th rowspan="2">漲跌$</th>
   <th rowspan="2">漲跌%</th>
@@ -192,10 +183,14 @@ td{padding:13px 14px;vertical-align:middle}
   <th rowspan="2">市值</th>
 </tr>
 <tr>
-  <th style="color:#58a6ff;font-size:0.7em">本週 Wall</th>
-  <th style="color:#58a6ff;font-size:0.7em">下週 Wall</th>
-  <th style="color:#58a6ff;font-size:0.7em">下下週 Wall</th>
-  <th style="color:#58a6ff;font-size:0.7em">下下下週 Wall</th>
+  <th style="color:#58a6ff;font-size:0.7em">本週 OI</th>
+  <th style="color:#79c0ff;font-size:0.7em">本週 GEX</th>
+  <th style="color:#58a6ff;font-size:0.7em">下週 OI</th>
+  <th style="color:#79c0ff;font-size:0.7em">下週 GEX</th>
+  <th style="color:#58a6ff;font-size:0.7em">下下週 OI</th>
+  <th style="color:#79c0ff;font-size:0.7em">下下週 GEX</th>
+  <th style="color:#58a6ff;font-size:0.7em">下下下週 OI</th>
+  <th style="color:#79c0ff;font-size:0.7em">下下下週 GEX</th>
   <th>P/E TTM</th><th>Fwd P/E</th>
   <th>IV / IVR</th><th>IV狀態</th><th>P/C Ratio</th>
 </tr>
@@ -203,194 +198,290 @@ td{padding:13px 14px;vertical-align:middle}
 <tbody>
 <tr>
   <td><div class="tk"><span class="tb">AAPL</span><span class="m7">Mag 7</span></div></td>
-  <td class="pr">$264.18</td>
+  <td class="pr">$262.80</td>
   <td class="oi"><div class="oi-lbl">本週 03-06</div>
-<div class="oi-call">▼ $260</div>
-<div class="oi-pain">⚡ $215</div>
-<div class="oi-put">▲ $110</div><div class="tz-wrap"><div style="color:#484f58;font-size:0.7em">目標：無訊號</div></div></td>
+<div class="oi-call">▼ $275</div>
+<div class="oi-pain">⚡ $270</div>
+<div class="oi-put">▲ $245</div><div class="tz-wrap"><div class="tz-call">🎯↑ $267.5</div><div class="tz-put">🎯↓ $260</div></div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $3,512M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:70%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下週 03-13</div>
-<div class="oi-call">▼ $260</div>
-<div class="oi-pain">⚡ $215</div>
-<div class="oi-put">▲ $110</div></td>
+<div class="oi-call">▼ $285</div>
+<div class="oi-pain">⚡ $270</div>
+<div class="oi-put">▲ $250</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $6M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下週 03-20<span style="font-size:0.65em;color:#e3b341;margin-left:3px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px">月結</span></div>
-<div class="oi-call">▼ $260</div>
-<div class="oi-pain">⚡ $215</div>
-<div class="oi-put">▲ $90</div></td>
+<div class="oi-call">▼ $280</div>
+<div class="oi-pain">⚡ $260</div>
+<div class="oi-put">▲ $260</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $8M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:0%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下下週 03-27</div>
-<div class="oi-call">▼ $260</div>
-<div class="oi-pain">⚡ $215</div>
-<div class="oi-put">▲ $120</div></td>
-  <td class="neg">-8.77</td><td class="neg pct">-3.21%</td>
-  <td><span class="vh">1.92x</span><span class="vb">放量</span></td>
-  <td><div class="ms-fv">$260 <span class="ms-prem">▲2%溢</span></div>
+<div class="oi-call">▼ $285</div>
+<div class="oi-pain">⚡ $265</div>
+<div class="oi-put">▲ $260</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $0M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
+  <td class="neg">-1.38</td><td class="neg pct">-0.52%</td>
+  <td>0.11x</td>
+  <td><div class="ms-fv">$260 <span class="ms-prem">▲1%溢</span></div>
     <div class="ms-str">★★★☆☆</div>
     <span class="ms-mw">Wide 護城河</span></td>
-  <td><div class="mad ma-price">$268.62</div><div class="mad ma-tag">▼ 跌破 -1.7%</div></td><td><div class="mad ma-price">$265.20</div><div class="mad ma-tag">▼ 跌破 -0.4%</div></td><td><div class="mau ma-price">$242.50</div><div class="mau ma-tag">▲ 站上 +8.9%</div></td>
-  <td><div class="pe">33.4x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
-  <td><div class="fpe-dn" style="color:#3fb950">28.4x</div><div class="pe-note pos">↓ 獲利成長</div></td>
+  <td><div class="mad ma-price">$268.79</div><div class="mad ma-tag">▼ 跌破 -2.2%</div></td><td><div class="mad ma-price">$264.97</div><div class="mad ma-tag">▼ 跌破 -0.8%</div></td><td><div class="mau ma-price">$242.75</div><div class="mau ma-tag">▲ 站上 +8.3%</div></td>
+  <td><div class="pe">33.3x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
+  <td><div class="fpe-dn" style="color:#3fb950">28.3x</div><div class="pe-note pos">↓ 獲利成長</div></td>
   <td><div class="ivr-bg"><div class="ivr-f ivrl" style="width:0%"></div></div>
-    <div class="ivr-lbl">0.7% · IVR 0%</div></td>
+    <div class="ivr-lbl">1.3% · IVR 0%</div></td>
   <td><span class="ivb ivs">低 IVR</span></td>
   <td><div class="pc-n">0.83</div><div class="pc-l">中性</div></td>
-  <td class="mc">$3.88T</td>
+  <td class="mc">$3.86T</td>
 </tr>
 <tr>
   <td><div class="tk"><span class="tb">MSFT</span><span class="m7">Mag 7</span></div></td>
-  <td class="pr">$392.74</td>
+  <td class="pr">$395.06</td>
   <td class="oi"><div class="oi-lbl">本週 03-06</div>
-<div class="oi-call">▼ $385</div>
-<div class="oi-pain">⚡ $320</div>
-<div class="oi-put">▲ $270</div><div class="tz-wrap"><div style="color:#484f58;font-size:0.7em">目標：無訊號</div></div></td>
+<div class="oi-call">▼ $390</div>
+<div class="oi-pain">⚡ $395</div>
+<div class="oi-put">▲ $400</div><div class="tz-wrap"><div class="tz-call">🎯↑ $400</div><div class="tz-put">🎯↓ $387.5</div></div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $153,416M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:100%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下週 03-13</div>
-<div class="oi-call">▼ $385</div>
-<div class="oi-pain">⚡ $320</div>
-<div class="oi-put">▲ $270</div></td>
+<div class="oi-call">▼ $420</div>
+<div class="oi-pain">⚡ $400</div>
+<div class="oi-put">▲ $400</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $19,288M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:100%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下週 03-20<span style="font-size:0.65em;color:#e3b341;margin-left:3px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px">月結</span></div>
-<div class="oi-call">▼ $385</div>
-<div class="oi-pain">⚡ $315</div>
-<div class="oi-put">▲ $175</div></td>
+<div class="oi-call">▼ $440</div>
+<div class="oi-pain">⚡ $415</div>
+<div class="oi-put">▲ $350</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $118,842M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:100%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下下週 03-27</div>
-<div class="oi-call">▼ $385</div>
-<div class="oi-pain">⚡ $320</div>
-<div class="oi-put">▲ $270</div></td>
-  <td class="neg">-8.98</td><td class="neg pct">-2.24%</td>
-  <td>1.32x</td>
-  <td><div class="ms-fv">$600 <span class="ms-disc">▼35%折</span></div>
+<div class="oi-call">▼ $450</div>
+<div class="oi-pain">⚡ $395</div>
+<div class="oi-put">▲ $350</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $30,153M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:100%"></div></div></td>
+  <td class="pos">+2.32</td><td class="pos pct">+0.59%</td>
+  <td>0.12x</td>
+  <td><div class="ms-fv">$600 <span class="ms-disc">▼34%折</span></div>
     <div class="ms-str">★★★★☆</div>
     <span class="ms-mw">Wide 護城河</span></td>
-  <td><div class="mad ma-price">$402.84</div><div class="mad ma-tag">▼ 跌破 -2.5%</div></td><td><div class="mad ma-price">$444.47</div><div class="mad ma-tag">▼ 跌破 -11.6%</div></td><td><div class="mad ma-price">$483.78</div><div class="mad ma-tag">▼ 跌破 -18.8%</div></td>
-  <td><div class="pe">24.6x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
-  <td><div class="fpe-dn" style="color:#3fb950">20.8x</div><div class="pe-note pos">↓ 獲利成長</div></td>
-  <td><div class="ivr-bg"><div class="ivr-f ivrl" style="width:0%"></div></div>
-    <div class="ivr-lbl">0.8% · IVR 0%</div></td>
-  <td><span class="ivb ivs">低 IVR</span></td>
-  <td><div class="pc-b">0.63</div><div class="pc-l">看多傾向</div></td>
-  <td class="mc">$2.92T</td>
-</tr>
-<tr>
-  <td><div class="tk"><span class="tb">NVDA</span><span class="m7">Mag 7</span></div></td>
-  <td class="pr">$177.19</td>
-  <td class="oi"><div class="oi-lbl">本週 03-06</div>
-<div class="oi-call">▼ $175</div>
-<div class="oi-pain">⚡ $145</div>
-<div class="oi-put">▲ $50</div><div class="tz-wrap"><div style="color:#484f58;font-size:0.7em">目標：無訊號</div></div></td>
-  <td class="oi"><div class="oi-lbl">下週 03-13</div>
-<div class="oi-call">▼ $175</div>
-<div class="oi-pain">⚡ $145</div>
-<div class="oi-put">▲ $50</div></td>
-  <td class="oi"><div class="oi-lbl">下下週 03-20<span style="font-size:0.65em;color:#e3b341;margin-left:3px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px">月結</span></div>
-<div class="oi-call">▼ $175</div>
-<div class="oi-pain">⚡ $145</div>
-<div class="oi-put">▲ $10</div></td>
-  <td class="oi"><div class="oi-lbl">下下下週 03-27</div>
-<div class="oi-call">▼ $175</div>
-<div class="oi-pain">⚡ $145</div>
-<div class="oi-put">▲ $50</div></td>
-  <td class="neg">-7.70</td><td class="neg pct">-4.16%</td>
-  <td>1.30x</td>
-  <td><div class="ms-fv">$232 <span class="ms-disc">▼24%折</span></div>
-    <div class="ms-str">★★★★☆</div>
-    <span class="ms-mw">Wide 護城河</span></td>
-  <td><div class="mad ma-price">$185.98</div><div class="mad ma-tag">▼ 跌破 -4.7%</div></td><td><div class="mad ma-price">$185.62</div><div class="mad ma-tag">▼ 跌破 -4.5%</div></td><td><div class="mau ma-price">$174.95</div><div class="mau ma-tag">▲ 站上 +1.3%</div></td>
-  <td><div class="pe">36.1x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
-  <td><div class="fpe-dn" style="color:#3fb950">16.6x</div><div class="pe-note pos">↓ 獲利成長</div></td>
+  <td><div class="mad ma-price">$401.13</div><div class="mad ma-tag">▼ 跌破 -1.5%</div></td><td><div class="mad ma-price">$442.86</div><div class="mad ma-tag">▼ 跌破 -10.8%</div></td><td><div class="mad ma-price">$483.53</div><div class="mad ma-tag">▼ 跌破 -18.3%</div></td>
+  <td><div class="pe">24.7x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
+  <td><div class="fpe-dn" style="color:#3fb950">21.0x</div><div class="pe-note pos">↓ 獲利成長</div></td>
   <td><div class="ivr-bg"><div class="ivr-f ivrl" style="width:0%"></div></div>
     <div class="ivr-lbl">0.5% · IVR 0%</div></td>
   <td><span class="ivb ivs">低 IVR</span></td>
+  <td><div class="pc-b">0.63</div><div class="pc-l">看多傾向</div></td>
+  <td class="mc">$2.94T</td>
+</tr>
+<tr>
+  <td><div class="tk"><span class="tb">NVDA</span><span class="m7">Mag 7</span></div></td>
+  <td class="pr">$179.58</td>
+  <td class="oi"><div class="oi-lbl">本週 03-06</div>
+<div class="oi-call">▼ $190</div>
+<div class="oi-pain">⚡ $185</div>
+<div class="oi-put">▲ $155</div><div class="tz-wrap"><div class="tz-call">🎯↑ $185</div><div class="tz-put">🎯↓ $155</div></div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $9,357M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:100%"></div></div></td>
+  <td class="oi"><div class="oi-lbl">下週 03-13</div>
+<div class="oi-call">▼ $195</div>
+<div class="oi-pain">⚡ $190</div>
+<div class="oi-put">▲ $170</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $10M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
+  <td class="oi"><div class="oi-lbl">下下週 03-20<span style="font-size:0.65em;color:#e3b341;margin-left:3px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px">月結</span></div>
+<div class="oi-call">▼ $200</div>
+<div class="oi-pain">⚡ $175</div>
+<div class="oi-put">▲ $180</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $92M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:1%"></div></div></td>
+  <td class="oi"><div class="oi-lbl">下下下週 03-27</div>
+<div class="oi-call">▼ $200</div>
+<div class="oi-pain">⚡ $180</div>
+<div class="oi-put">▲ $170</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $7M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
+  <td class="pos">+2.39</td><td class="pos pct">+1.35%</td>
+  <td>0.12x</td>
+  <td><div class="ms-fv">$232 <span class="ms-disc">▼23%折</span></div>
+    <div class="ms-str">★★★★☆</div>
+    <span class="ms-mw">Wide 護城河</span></td>
+  <td><div class="mad ma-price">$185.41</div><div class="mad ma-tag">▼ 跌破 -3.1%</div></td><td><div class="mad ma-price">$185.66</div><div class="mad ma-tag">▼ 跌破 -3.3%</div></td><td><div class="mau ma-price">$175.19</div><div class="mau ma-tag">▲ 站上 +2.5%</div></td>
+  <td><div class="pe">36.6x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
+  <td><div class="fpe-dn" style="color:#3fb950">16.7x</div><div class="pe-note pos">↓ 獲利成長</div></td>
+  <td><div class="ivr-bg"><div class="ivr-f ivrl" style="width:0%"></div></div>
+    <div class="ivr-lbl">1.2% · IVR 0%</div></td>
+  <td><span class="ivb ivs">低 IVR</span></td>
   <td><div class="pc-b">0.61</div><div class="pc-l">看多傾向</div></td>
-  <td class="mc">$4.31T</td>
+  <td class="mc">$4.37T</td>
 </tr>
 <tr>
   <td><div class="tk"><span class="tb">AMZN</span><span class="m7">Mag 7</span></div></td>
-  <td class="pr">$210.00</td>
+  <td class="pr">$206.29</td>
   <td class="oi"><div class="oi-lbl">本週 03-06</div>
-<div class="oi-call">▼ $207.5</div>
-<div class="oi-pain">⚡ $170</div>
-<div class="oi-put">▲ $125</div><div class="tz-wrap"><div style="color:#484f58;font-size:0.7em">目標：無訊號</div></div></td>
+<div class="oi-call">▼ $220</div>
+<div class="oi-pain">⚡ $205</div>
+<div class="oi-put">▲ $200</div><div class="tz-wrap"><div class="tz-call">🎯↑ $210</div><div class="tz-put">🎯↓ $200</div></div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $39M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:0%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下週 03-13</div>
-<div class="oi-call">▼ $207.5</div>
-<div class="oi-pain">⚡ $170</div>
-<div class="oi-put">▲ $125</div></td>
+<div class="oi-call">▼ $220</div>
+<div class="oi-pain">⚡ $205</div>
+<div class="oi-put">▲ $200</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $2M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下週 03-20<span style="font-size:0.65em;color:#e3b341;margin-left:3px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px">月結</span></div>
-<div class="oi-call">▼ $207.5</div>
-<div class="oi-pain">⚡ $170</div>
-<div class="oi-put">▲ $85</div></td>
+<div class="oi-call">▼ $220</div>
+<div class="oi-pain">⚡ $215</div>
+<div class="oi-put">▲ $200</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $0M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下下週 03-27</div>
-<div class="oi-call">▼ $210</div>
-<div class="oi-pain">⚡ $170</div>
-<div class="oi-put">▲ $125</div></td>
-  <td class="pos">+2.08</td><td class="pos pct">+1.00%</td>
-  <td>1.25x</td>
-  <td><div class="ms-fv">$260 <span class="ms-disc">▼19%折</span></div>
+<div class="oi-call">▼ $225</div>
+<div class="oi-pain">⚡ $205</div>
+<div class="oi-put">▲ $160</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $0M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
+  <td class="neg">-3.71</td><td class="neg pct">-1.76%</td>
+  <td>0.12x</td>
+  <td><div class="ms-fv">$260 <span class="ms-disc">▼21%折</span></div>
     <div class="ms-str">★★★★☆</div>
     <span class="ms-mw">Wide 護城河</span></td>
-  <td><div class="mad ma-price">$213.42</div><div class="mad ma-tag">▼ 跌破 -1.6%</div></td><td><div class="mad ma-price">$226.59</div><div class="mad ma-tag">▼ 跌破 -7.3%</div></td><td><div class="mad ma-price">$224.35</div><div class="mad ma-tag">▼ 跌破 -6.4%</div></td>
-  <td><div class="pe">29.3x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
-  <td><div class="fpe-dn" style="color:#3fb950">22.5x</div><div class="pe-note pos">↓ 獲利成長</div></td>
+  <td><div class="mad ma-price">$211.77</div><div class="mad ma-tag">▼ 跌破 -2.6%</div></td><td><div class="mad ma-price">$226.27</div><div class="mad ma-tag">▼ 跌破 -8.8%</div></td><td><div class="mad ma-price">$224.32</div><div class="mad ma-tag">▼ 跌破 -8.0%</div></td>
+  <td><div class="pe">28.8x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
+  <td><div class="fpe-dn" style="color:#3fb950">22.1x</div><div class="pe-note pos">↓ 獲利成長</div></td>
   <td><div class="ivr-bg"><div class="ivr-f ivrl" style="width:0%"></div></div>
     <div class="ivr-lbl">0.5% · IVR 0%</div></td>
   <td><span class="ivb ivs">低 IVR</span></td>
   <td><div class="pc-r">1.11</div><div class="pc-l">避險需求</div></td>
-  <td class="mc">$2.25T</td>
+  <td class="mc">$2.21T</td>
 </tr>
 <tr>
   <td><div class="tk"><span class="tb">GOOGL</span><span class="m7">Mag 7</span></div></td>
-  <td class="pr">$311.76</td>
+  <td class="pr">$304.70</td>
   <td class="oi"><div class="oi-lbl">本週 03-06</div>
-<div class="oi-call">▼ $307.5</div>
-<div class="oi-pain">⚡ $250</div>
-<div class="oi-put">▲ $115</div><div class="tz-wrap"><div style="color:#484f58;font-size:0.7em">目標：無訊號</div></div></td>
+<div class="oi-call">▼ $320</div>
+<div class="oi-pain">⚡ $310</div>
+<div class="oi-put">▲ $282.5</div><div class="tz-wrap"><div class="tz-call">🎯↑ $310</div><div class="tz-put">🎯↓ $280</div></div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $10,633M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:100%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下週 03-13</div>
-<div class="oi-call">▼ $307.5</div>
-<div class="oi-pain">⚡ $250</div>
-<div class="oi-put">▲ $165</div></td>
+<div class="oi-call">▼ $325</div>
+<div class="oi-pain">⚡ $320</div>
+<div class="oi-put">▲ $300</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $42M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下週 03-20<span style="font-size:0.65em;color:#e3b341;margin-left:3px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px">月結</span></div>
-<div class="oi-call">▼ $307.5</div>
-<div class="oi-pain">⚡ $250</div>
-<div class="oi-put">▲ $75</div></td>
+<div class="oi-call">▼ $380</div>
+<div class="oi-pain">⚡ $305</div>
+<div class="oi-put">▲ $280</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $523M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:10%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下下週 03-27</div>
-<div class="oi-call">▼ $310</div>
-<div class="oi-pain">⚡ $250</div>
-<div class="oi-put">▲ $150</div></td>
-  <td class="pos">+4.38</td><td class="pos pct">+1.42%</td>
-  <td>1.44x</td>
-  <td><div class="ms-fv">$340 <span class="ms-disc">▼8%折</span></div>
+<div class="oi-call">▼ $340</div>
+<div class="oi-pain">⚡ $305</div>
+<div class="oi-put">▲ $290</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $0M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
+  <td class="neg">-7.06</td><td class="neg pct">-2.26%</td>
+  <td>0.10x</td>
+  <td><div class="ms-fv">$340 <span class="ms-disc">▼10%折</span></div>
     <div class="ms-str">★★★☆☆</div>
     <span class="ms-mw">Wide 護城河</span></td>
-  <td><div class="mad ma-price">$317.74</div><div class="mad ma-tag">▼ 跌破 -1.9%</div></td><td><div class="mad ma-price">$319.98</div><div class="mad ma-tag">▼ 跌破 -2.6%</div></td><td><div class="mau ma-price">$249.41</div><div class="mau ma-tag">▲ 站上 +25.0%</div></td>
-  <td><div class="pe">28.8x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
-  <td><div class="fpe-dn" style="color:#3fb950">23.2x</div><div class="pe-note pos">↓ 獲利成長</div></td>
+  <td><div class="mad ma-price">$316.07</div><div class="mad ma-tag">▼ 跌破 -3.6%</div></td><td><div class="mad ma-price">$319.95</div><div class="mad ma-tag">▼ 跌破 -4.8%</div></td><td><div class="mau ma-price">$250.14</div><div class="mau ma-tag">▲ 站上 +21.8%</div></td>
+  <td><div class="pe">28.2x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
+  <td><div class="fpe-dn" style="color:#3fb950">22.7x</div><div class="pe-note pos">↓ 獲利成長</div></td>
   <td><div class="ivr-bg"><div class="ivr-f ivrl" style="width:0%"></div></div>
-    <div class="ivr-lbl">0.3% · IVR 0%</div></td>
+    <div class="ivr-lbl">0.6% · IVR 0%</div></td>
   <td><span class="ivb ivs">低 IVR</span></td>
   <td><div class="pc-r">1.07</div><div class="pc-l">避險需求</div></td>
-  <td class="mc">$3.77T</td>
+  <td class="mc">$3.69T</td>
 </tr>
 <tr>
   <td><div class="tk"><span class="tb">META</span><span class="m7">Mag 7</span></div></td>
-  <td class="pr">$648.18</td>
+  <td class="pr">$647.82</td>
   <td class="oi"><div class="oi-lbl">本週 03-06</div>
-<div class="oi-call">▼ $637.5</div>
-<div class="oi-pain">⚡ $520</div>
-<div class="oi-put">▲ $110</div><div class="tz-wrap"><div style="color:#484f58;font-size:0.7em">目標：無訊號</div></div></td>
+<div class="oi-call">▼ $700</div>
+<div class="oi-pain">⚡ $650</div>
+<div class="oi-put">▲ $600</div><div class="tz-wrap"><div class="tz-call">🎯↑ $660</div><div class="tz-put">🎯↓ $600</div></div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $12,300M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:100%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下週 03-13</div>
-<div class="oi-call">▼ $637.5</div>
-<div class="oi-pain">⚡ $520</div>
-<div class="oi-put">▲ $100</div></td>
+<div class="oi-call">▼ $680</div>
+<div class="oi-pain">⚡ $650</div>
+<div class="oi-put">▲ $590</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $1M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:0%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下週 03-20<span style="font-size:0.65em;color:#e3b341;margin-left:3px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px">月結</span></div>
-<div class="oi-call">▼ $637.5</div>
-<div class="oi-pain">⚡ $520</div>
-<div class="oi-put">▲ $10</div></td>
+<div class="oi-call">▼ $700</div>
+<div class="oi-pain">⚡ $650</div>
+<div class="oi-put">▲ $600</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $0M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下下週 03-27</div>
-<div class="oi-call">▼ $640</div>
-<div class="oi-pain">⚡ $520</div>
-<div class="oi-put">▲ $290</div></td>
-  <td class="neg">-8.83</td><td class="neg pct">-1.34%</td>
-  <td><span class="vh">1.54x</span><span class="vb">放量</span></td>
+<div class="oi-call">▼ $690</div>
+<div class="oi-pain">⚡ $650</div>
+<div class="oi-put">▲ $575</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $0M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
+  <td class="neg">-0.36</td><td class="neg pct">-0.06%</td>
+  <td>0.09x</td>
   <td><div class="ms-fv">$850 <span class="ms-disc">▼24%折</span></div>
     <div class="ms-str">★★★★☆</div>
     <span class="ms-mw">Wide 護城河</span></td>
-  <td><div class="mad ma-price">$661.99</div><div class="mad ma-tag">▼ 跌破 -2.1%</div></td><td><div class="mad ma-price">$656.70</div><div class="mad ma-tag">▼ 跌破 -1.3%</div></td><td><div class="mad ma-price">$690.59</div><div class="mad ma-tag">▼ 跌破 -6.1%</div></td>
+  <td><div class="mad ma-price">$658.56</div><div class="mad ma-tag">▼ 跌破 -1.6%</div></td><td><div class="mad ma-price">$656.51</div><div class="mad ma-tag">▼ 跌破 -1.3%</div></td><td><div class="mad ma-price">$690.55</div><div class="mad ma-tag">▼ 跌破 -6.2%</div></td>
   <td><div class="pe">27.6x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
   <td><div class="fpe-dn" style="color:#3fb950">18.1x</div><div class="pe-note pos">↓ 獲利成長</div></td>
   <td><div class="ivr-bg"><div class="ivr-f ivrl" style="width:0%"></div></div>
@@ -401,267 +492,395 @@ td{padding:13px 14px;vertical-align:middle}
 </tr>
 <tr>
   <td><div class="tk"><span class="tb">TSLA</span><span class="m7">Mag 7</span></div></td>
-  <td class="pr">$402.51</td>
+  <td class="pr">$395.54</td>
   <td class="oi"><div class="oi-lbl">本週 03-06</div>
-<div class="oi-call">▼ $395</div>
-<div class="oi-pain">⚡ $322.5</div>
-<div class="oi-put">▲ $80</div><div class="tz-wrap"><div style="color:#484f58;font-size:0.7em">目標：無訊號</div></div></td>
+<div class="oi-call">▼ $425</div>
+<div class="oi-pain">⚡ $407.5</div>
+<div class="oi-put">▲ $400</div><div class="tz-wrap"><div class="tz-call">🎯↑ $400</div><div class="tz-put">🎯↓ $390</div></div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $4,507M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:90%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下週 03-13</div>
-<div class="oi-call">▼ $395</div>
-<div class="oi-pain">⚡ $325</div>
-<div class="oi-put">▲ $80</div></td>
+<div class="oi-call">▼ $450</div>
+<div class="oi-pain">⚡ $410</div>
+<div class="oi-put">▲ $310</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $0M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下週 03-20<span style="font-size:0.65em;color:#e3b341;margin-left:3px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px">月結</span></div>
-<div class="oi-call">▼ $395</div>
-<div class="oi-pain">⚡ $325</div>
-<div class="oi-put">▲ $10</div></td>
+<div class="oi-call">▼ $500</div>
+<div class="oi-pain">⚡ $415</div>
+<div class="oi-put">▲ $300</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $1M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:0%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下下週 03-27</div>
-<div class="oi-call">▼ $395</div>
-<div class="oi-pain">⚡ $325</div>
-<div class="oi-put">▲ $80</div></td>
-  <td class="neg">-6.07</td><td class="neg pct">-1.49%</td>
-  <td>0.96x</td>
-  <td><div class="ms-fv">$400 <span class="ms-prem">▲1%溢</span></div>
+<div class="oi-call">▼ $435</div>
+<div class="oi-pain">⚡ $410</div>
+<div class="oi-put">▲ $400</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $0M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:0%"></div></div></td>
+  <td class="neg">-6.97</td><td class="neg pct">-1.73%</td>
+  <td>0.14x</td>
+  <td><div class="ms-fv">$400 <span class="ms-disc">▼1%折</span></div>
     <div class="ms-str">★★★☆☆</div>
     <span class="ms-mn">Narrow 護城河</span></td>
-  <td><div class="mad ma-price">$413.85</div><div class="mad ma-tag">▼ 跌破 -2.7%</div></td><td><div class="mad ma-price">$436.14</div><div class="mad ma-tag">▼ 跌破 -7.7%</div></td><td><div class="mau ma-price">$390.66</div><div class="mau ma-tag">▲ 站上 +3.0%</div></td>
-  <td><div class="pe pe-w">369.3x</div><div class="pe-note" style="color:#e3b341">⚠ 極高估值</div></td>
-  <td><div class="fpe-dn" style="color:#e3b341">143.5x</div><div class="pe-note pos">↓ 獲利成長</div></td>
-  <td><div class="ivr-bg"><div class="ivr-f ivrl" style="width:0%"></div></div>
-    <div class="ivr-lbl">0.8% · IVR 0%</div></td>
-  <td><span class="ivb ivs">低 IVR</span></td>
-  <td><div class="pc-r">1.11</div><div class="pc-l">避險需求</div></td>
-  <td class="mc">$1.51T</td>
-</tr>
-<tr>
-  <td><div class="tk"><span class="tb">TSM</span></div></td>
-  <td class="pr">$374.58</td>
-  <td class="oi"><div class="oi-lbl">本週 03-06</div>
-<div class="oi-call">▼ $367.5</div>
-<div class="oi-pain">⚡ $300</div>
-<div class="oi-put">▲ $165</div><div class="tz-wrap"><div style="color:#484f58;font-size:0.7em">目標：無訊號</div></div></td>
-  <td class="oi"><div class="oi-lbl">下週 03-13</div>
-<div class="oi-call">▼ $367.5</div>
-<div class="oi-pain">⚡ $300</div>
-<div class="oi-put">▲ $170</div></td>
-  <td class="oi"><div class="oi-lbl">下下週 03-20<span style="font-size:0.65em;color:#e3b341;margin-left:3px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px">月結</span></div>
-<div class="oi-call">▼ $367.5</div>
-<div class="oi-pain">⚡ $300</div>
-<div class="oi-put">▲ $70</div></td>
-  <td class="oi"><div class="oi-lbl">下下下週 03-27</div>
-<div class="oi-call">▼ $370</div>
-<div class="oi-pain">⚡ $300</div>
-<div class="oi-put">▲ $170</div></td>
-  <td class="neg">-2.23</td><td class="neg pct">-0.59%</td>
-  <td>0.76x</td>
-  <td><div class="ms-fv">$428 <span class="ms-disc">▼12%折</span></div>
-    <div class="ms-str">★★★☆☆</div>
-    <span class="ms-mw">Wide 護城河</span></td>
-  <td><div class="mau ma-price">$359.56</div><div class="mau ma-tag">▲ 站上 +4.2%</div></td><td><div class="mau ma-price">$333.94</div><div class="mau ma-tag">▲ 站上 +12.2%</div></td><td><div class="mau ma-price">$272.47</div><div class="mau ma-tag">▲ 站上 +37.5%</div></td>
-  <td><div class="pe">35.3x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
-  <td><div class="fpe-dn" style="color:#3fb950">20.8x</div><div class="pe-note pos">↓ 獲利成長</div></td>
-  <td><div class="ivr-bg"><div class="ivr-f ivrl" style="width:0%"></div></div>
-    <div class="ivr-lbl">0.6% · IVR 0%</div></td>
-  <td><span class="ivb ivs">低 IVR</span></td>
-  <td><div class="pc-n">0.92</div><div class="pc-l">中性</div></td>
-  <td class="mc">$1.94T</td>
-</tr>
-<tr>
-  <td><div class="tk"><span class="tb">MU</span></div></td>
-  <td class="pr">$412.37</td>
-  <td class="oi"><div class="oi-lbl">本週 03-06</div>
-<div class="oi-call">▼ $405</div>
-<div class="oi-pain">⚡ $330</div>
-<div class="oi-put">▲ $120</div><div class="tz-wrap"><div style="color:#484f58;font-size:0.7em">目標：無訊號</div></div></td>
-  <td class="oi"><div class="oi-lbl">下週 03-13</div>
-<div class="oi-call">▼ $405</div>
-<div class="oi-pain">⚡ $330</div>
-<div class="oi-put">▲ $35</div></td>
-  <td class="oi"><div class="oi-lbl">下下週 03-20<span style="font-size:0.65em;color:#e3b341;margin-left:3px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px">月結</span></div>
-<div class="oi-call">▼ $405</div>
-<div class="oi-pain">⚡ $330</div>
-<div class="oi-put">▲ $35</div></td>
-  <td class="oi"><div class="oi-lbl">下下下週 03-27</div>
-<div class="oi-call">▼ $405</div>
-<div class="oi-pain">⚡ $330</div>
-<div class="oi-put">▲ $35</div></td>
-  <td class="neg">-3.19</td><td class="neg pct">-0.77%</td>
-  <td>0.94x</td>
-  <td><div class="ms-fv">$115 <span class="ms-prem">▲259%溢</span></div>
-    <div class="ms-str">★★★★☆</div>
-    <span class="ms-m0">No Moat</span></td>
-  <td><div class="mau ma-price">$409.20</div><div class="mau ma-tag">▲ 站上 +0.8%</div></td><td><div class="mau ma-price">$361.47</div><div class="mau ma-tag">▲ 站上 +14.1%</div></td><td><div class="mau ma-price">$207.68</div><div class="mau ma-tag">▲ 站上 +98.6%</div></td>
-  <td><div class="pe">39.2x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
-  <td><div class="fpe-dn" style="color:#3fb950">9.3x</div><div class="pe-note pos">↓ 獲利成長</div></td>
+  <td><div class="mad ma-price">$412.11</div><div class="mad ma-tag">▼ 跌破 -4.0%</div></td><td><div class="mad ma-price">$434.25</div><div class="mad ma-tag">▼ 跌破 -8.9%</div></td><td><div class="mau ma-price">$390.97</div><div class="mau ma-tag">▲ 站上 +1.2%</div></td>
+  <td><div class="pe pe-w">363.0x</div><div class="pe-note" style="color:#e3b341">⚠ 極高估值</div></td>
+  <td><div class="fpe-dn" style="color:#e3b341">141.1x</div><div class="pe-note pos">↓ 獲利成長</div></td>
   <td><div class="ivr-bg"><div class="ivr-f ivrl" style="width:0%"></div></div>
     <div class="ivr-lbl">0.3% · IVR 0%</div></td>
   <td><span class="ivb ivs">低 IVR</span></td>
-  <td><div class="pc-b">0.58</div><div class="pc-l">看多傾向</div></td>
-  <td class="mc">$464.1B</td>
+  <td><div class="pc-r">1.11</div><div class="pc-l">避險需求</div></td>
+  <td class="mc">$1.48T</td>
+</tr>
+<tr>
+  <td><div class="tk"><span class="tb">TSM</span></div></td>
+  <td class="pr">$368.39</td>
+  <td class="oi"><div class="oi-lbl">本週 03-06</div>
+<div class="oi-call">▼ $385</div>
+<div class="oi-pain">⚡ $375</div>
+<div class="oi-put">▲ $322.5</div><div class="tz-wrap"><div class="tz-call">🎯↑ $372.5</div><div class="tz-put">🎯↓ $340</div></div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $938M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:18%"></div></div></td>
+  <td class="oi"><div class="oi-lbl">下週 03-13</div>
+<div class="oi-call">▼ $415</div>
+<div class="oi-pain">⚡ $360</div>
+<div class="oi-put">▲ $275</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $1M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
+  <td class="oi"><div class="oi-lbl">下下週 03-20<span style="font-size:0.65em;color:#e3b341;margin-left:3px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px">月結</span></div>
+<div class="oi-call">▼ $450</div>
+<div class="oi-pain">⚡ $340</div>
+<div class="oi-put">▲ $320</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $1M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:0%"></div></div></td>
+  <td class="oi"><div class="oi-lbl">下下下週 03-27</div>
+<div class="oi-call">▼ $420</div>
+<div class="oi-pain">⚡ $375</div>
+<div class="oi-put">▲ $290</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $0M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
+  <td class="neg">-6.19</td><td class="neg pct">-1.65%</td>
+  <td>0.18x</td>
+  <td><div class="ms-fv">$428 <span class="ms-disc">▼14%折</span></div>
+    <div class="ms-str">★★★☆☆</div>
+    <span class="ms-mw">Wide 護城河</span></td>
+  <td><div class="mau ma-price">$361.45</div><div class="mau ma-tag">▲ 站上 +1.9%</div></td><td><div class="mau ma-price">$335.57</div><div class="mau ma-tag">▲ 站上 +9.8%</div></td><td><div class="mau ma-price">$273.35</div><div class="mau ma-tag">▲ 站上 +34.8%</div></td>
+  <td><div class="pe">34.8x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
+  <td><div class="fpe-dn" style="color:#3fb950">20.5x</div><div class="pe-note pos">↓ 獲利成長</div></td>
+  <td><div class="ivr-bg"><div class="ivr-f ivrl" style="width:0%"></div></div>
+    <div class="ivr-lbl">0.7% · IVR 0%</div></td>
+  <td><span class="ivb ivs">低 IVR</span></td>
+  <td><div class="pc-n">0.92</div><div class="pc-l">中性</div></td>
+  <td class="mc">$1.91T</td>
+</tr>
+<tr>
+  <td><div class="tk"><span class="tb">MU</span></div></td>
+  <td class="pr">$408.55</td>
+  <td class="oi"><div class="oi-lbl">本週 03-06</div>
+<div class="oi-call">▼ $420</div>
+<div class="oi-pain">⚡ $410</div>
+<div class="oi-put">▲ $347.5</div><div class="tz-wrap"><div class="tz-call">🎯↑ $420</div><div class="tz-put">🎯↓ $400</div></div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $381M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:7%"></div></div></td>
+  <td class="oi"><div class="oi-lbl">下週 03-13</div>
+<div class="oi-call">▼ $500</div>
+<div class="oi-pain">⚡ $400</div>
+<div class="oi-put">▲ $400</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $52M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:1%"></div></div></td>
+  <td class="oi"><div class="oi-lbl">下下週 03-20<span style="font-size:0.65em;color:#e3b341;margin-left:3px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px">月結</span></div>
+<div class="oi-call">▼ $500</div>
+<div class="oi-pain">⚡ $395</div>
+<div class="oi-put">▲ $330</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $0M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
+  <td class="oi"><div class="oi-lbl">下下下週 03-27</div>
+<div class="oi-call">▼ $450</div>
+<div class="oi-pain">⚡ $400</div>
+<div class="oi-put">▲ $300</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $0M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
+  <td class="neg">-3.82</td><td class="neg pct">-0.93%</td>
+  <td>0.18x</td>
+  <td><div class="ms-fv">$115 <span class="ms-prem">▲255%溢</span></div>
+    <div class="ms-str">★★★★☆</div>
+    <span class="ms-m0">No Moat</span></td>
+  <td><div class="mad ma-price">$408.89</div><div class="mad ma-tag">▼ 跌破 -0.1%</div></td><td><div class="mau ma-price">$365.00</div><div class="mau ma-tag">▲ 站上 +11.9%</div></td><td><div class="mau ma-price">$209.24</div><div class="mau ma-tag">▲ 站上 +95.3%</div></td>
+  <td><div class="pe">38.8x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
+  <td><div class="fpe-dn" style="color:#3fb950">9.1x</div><div class="pe-note pos">↓ 獲利成長</div></td>
+  <td><div class="ivr-bg"><div class="ivr-f ivrl" style="width:0%"></div></div>
+    <div class="ivr-lbl">0.7% · IVR 0%</div></td>
+  <td><span class="ivb ivs">低 IVR</span></td>
+  <td><div class="pc-b">0.59</div><div class="pc-l">看多傾向</div></td>
+  <td class="mc">$459.8B</td>
 </tr>
 <tr>
   <td><div class="tk"><span class="tb">SNDK</span></div></td>
-  <td class="pr">$635.36</td>
+  <td class="pr">$615.70</td>
   <td class="oi"><div class="oi-lbl">本週 03-06</div>
-<div class="oi-call">▼ $625</div>
-<div class="oi-pain">⚡ $510</div>
-<div class="oi-put">▲ $235</div><div class="tz-wrap"><div style="color:#484f58;font-size:0.7em">目標：無訊號</div></div></td>
+<div class="oi-call">▼ $700</div>
+<div class="oi-pain">⚡ $640</div>
+<div class="oi-put">▲ $600</div><div class="tz-wrap"><div class="tz-call">🎯↑ $700</div><div class="tz-put">🎯↓ $550</div></div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $31M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:0%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下週 03-13</div>
-<div class="oi-call">▼ $625</div>
-<div class="oi-pain">⚡ $510</div>
-<div class="oi-put">▲ $265</div></td>
+<div class="oi-call">▼ $730</div>
+<div class="oi-pain">⚡ $620</div>
+<div class="oi-put">▲ $510</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $3M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下週 03-20<span style="font-size:0.65em;color:#e3b341;margin-left:3px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px">月結</span></div>
-<div class="oi-call">▼ $625</div>
-<div class="oi-pain">⚡ $510</div>
-<div class="oi-put">▲ $60</div></td>
+<div class="oi-call">▼ $800</div>
+<div class="oi-pain">⚡ $600</div>
+<div class="oi-put">▲ $440</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $0M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下下週 03-27</div>
-<div class="oi-call">▼ $625</div>
-<div class="oi-pain">⚡ $510</div>
-<div class="oi-put">▲ $285</div></td>
-  <td class="neg">-16.54</td><td class="neg pct">-2.54%</td>
-  <td>0.80x</td>
-  <td><div class="ms-fv">$138 <span class="ms-prem">▲360%溢</span></div>
+<div class="oi-call">▼ $700</div>
+<div class="oi-pain">⚡ $610</div>
+<div class="oi-put">▲ $500</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $0M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
+  <td class="neg">-19.66</td><td class="neg pct">-3.09%</td>
+  <td>0.12x</td>
+  <td><div class="ms-fv">$138 <span class="ms-prem">▲346%溢</span></div>
     <div class="ms-str">★★★★★</div>
     <span class="ms-m0">No Moat</span></td>
-  <td><div class="mau ma-price">$618.18</div><div class="mau ma-tag">▲ 站上 +2.8%</div></td><td><div class="mau ma-price">$457.00</div><div class="mau ma-tag">▲ 站上 +39.0%</div></td><td><div class="mau ma-price">$191.00</div><div class="mau ma-tag">▲ 站上 +232.7%</div></td>
+  <td><div class="mad ma-price">$620.15</div><div class="mad ma-tag">▼ 跌破 -0.7%</div></td><td><div class="mau ma-price">$465.12</div><div class="mau ma-tag">▲ 站上 +32.4%</div></td><td><div class="mau ma-price">$193.87</div><div class="mau ma-tag">▲ 站上 +217.6%</div></td>
   <td><div class="pe pe-l">虧損中</div><div class="pe-note neg">EPS 為負</div></td>
-  <td><div class="fpe-fl">7.8x</div><div class="pe-note gf">≈ 平穩</div></td>
+  <td><div class="fpe-fl">7.6x</div><div class="pe-note gf">≈ 平穩</div></td>
   <td><div class="ivr-bg"><div class="ivr-f ivrl" style="width:0%"></div></div>
     <div class="ivr-lbl">0.3% · IVR 0%</div></td>
   <td><span class="ivb ivs">低 IVR</span></td>
   <td><div class="pc-n">0.77</div><div class="pc-l">中性</div></td>
-  <td class="mc">$93.8B</td>
+  <td class="mc">$90.9B</td>
 </tr>
 <tr>
   <td><div class="tk"><span class="tb">NFLX</span></div></td>
-  <td class="pr">$96.24</td>
+  <td class="pr">$96.49</td>
   <td class="oi"><div class="oi-lbl">本週 03-06</div>
-<div class="oi-call">▼ $95</div>
-<div class="oi-pain">⚡ $77</div>
-<div class="oi-put">▲ $40</div><div class="tz-wrap"><div style="color:#484f58;font-size:0.7em">目標：無訊號</div></div></td>
+<div class="oi-call">▼ $100</div>
+<div class="oi-pain">⚡ $84</div>
+<div class="oi-put">▲ $79</div><div class="tz-wrap"><div class="tz-call">🎯↑ $100</div><div class="tz-put">🎯↓ $90</div></div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $646M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:12%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下週 03-13</div>
-<div class="oi-call">▼ $95</div>
-<div class="oi-pain">⚡ $77</div>
-<div class="oi-put">▲ $40</div></td>
+<div class="oi-call">▼ $100</div>
+<div class="oi-pain">⚡ $93</div>
+<div class="oi-put">▲ $80</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $2M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下週 03-20<span style="font-size:0.65em;color:#e3b341;margin-left:3px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px">月結</span></div>
-<div class="oi-call">▼ $175</div>
-<div class="oi-pain">⚡ $77</div>
-<div class="oi-put">▲ $4</div></td>
+<div class="oi-call">▼ $100</div>
+<div class="oi-pain">⚡ $85</div>
+<div class="oi-put">▲ $80</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $0M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:0%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下下週 03-27</div>
-<div class="oi-call">▼ $95</div>
-<div class="oi-pain">⚡ $77</div>
-<div class="oi-put">▲ $40</div></td>
-  <td class="pos">+11.65</td><td class="pos pct">+13.77%</td>
-  <td><span class="vh">3.54x</span><span class="vb">放量</span></td>
+<div class="oi-call">▼ $100</div>
+<div class="oi-pain">⚡ $84</div>
+<div class="oi-put">▲ $75</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $0M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
+  <td class="pos">+0.25</td><td class="pos pct">+0.26%</td>
+  <td>0.12x</td>
   <td><div class="ms-fv">$79 <span class="ms-prem">▲22%溢</span></div>
     <div class="ms-str">★★★☆☆</div>
     <span class="ms-mn">Narrow 護城河</span></td>
-  <td><div class="mau ma-price">$80.68</div><div class="mau ma-tag">▲ 站上 +19.3%</div></td><td><div class="mau ma-price">$86.35</div><div class="mau ma-tag">▲ 站上 +11.5%</div></td><td><div class="mad ma-price">$110.14</div><div class="mad ma-tag">▼ 跌破 -12.6%</div></td>
-  <td><div class="pe">38.0x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
+  <td><div class="mau ma-price">$81.33</div><div class="mau ma-tag">▲ 站上 +18.6%</div></td><td><div class="mau ma-price">$86.39</div><div class="mau ma-tag">▲ 站上 +11.7%</div></td><td><div class="mad ma-price">$110.06</div><div class="mad ma-tag">▼ 跌破 -12.3%</div></td>
+  <td><div class="pe">38.1x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
   <td><div class="fpe-dn" style="color:#3fb950">25.2x</div><div class="pe-note pos">↓ 獲利成長</div></td>
   <td><div class="ivr-bg"><div class="ivr-f ivrl" style="width:0%"></div></div>
     <div class="ivr-lbl">0.0% · IVR 0%</div></td>
   <td><span class="ivb ivs">低 IVR</span></td>
   <td><div class="pc-b">0.26</div><div class="pc-l">看多傾向</div></td>
-  <td class="mc">$408.2B</td>
+  <td class="mc">$409.3B</td>
 </tr>
 <tr>
   <td><div class="tk"><span class="tb">AMD</span></div></td>
-  <td class="pr">$200.21</td>
+  <td class="pr">$193.06</td>
   <td class="oi"><div class="oi-lbl">本週 03-06</div>
-<div class="oi-call">▼ $197.5</div>
-<div class="oi-pain">⚡ $162.5</div>
-<div class="oi-put">▲ $40</div><div class="tz-wrap"><div style="color:#484f58;font-size:0.7em">目標：無訊號</div></div></td>
+<div class="oi-call">▼ $220</div>
+<div class="oi-pain">⚡ $202.5</div>
+<div class="oi-put">▲ $160</div><div class="tz-wrap"><div class="tz-call">🎯↑ $200</div><div class="tz-put">🎯↓ $160</div></div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $1,714M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:34%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下週 03-13</div>
-<div class="oi-call">▼ $197.5</div>
-<div class="oi-pain">⚡ $162.5</div>
-<div class="oi-put">▲ $40</div></td>
+<div class="oi-call">▼ $230</div>
+<div class="oi-pain">⚡ $200</div>
+<div class="oi-put">▲ $190</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $12M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:0%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下週 03-20<span style="font-size:0.65em;color:#e3b341;margin-left:3px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px">月結</span></div>
-<div class="oi-call">▼ $197.5</div>
-<div class="oi-pain">⚡ $165</div>
-<div class="oi-put">▲ $45</div></td>
+<div class="oi-call">▼ $230</div>
+<div class="oi-pain">⚡ $200</div>
+<div class="oi-put">▲ $165</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $1M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下下週 03-27</div>
-<div class="oi-call">▼ $200</div>
-<div class="oi-pain">⚡ $165</div>
-<div class="oi-put">▲ $50</div></td>
-  <td class="neg">-3.47</td><td class="neg pct">-1.70%</td>
-  <td>0.66x</td>
-  <td><div class="ms-fv">$145 <span class="ms-prem">▲38%溢</span></div>
+<div class="oi-call">▼ $240</div>
+<div class="oi-pain">⚡ $205</div>
+<div class="oi-put">▲ $145</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $0M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
+  <td class="neg">-7.15</td><td class="neg pct">-3.57%</td>
+  <td>0.12x</td>
+  <td><div class="ms-fv">$145 <span class="ms-prem">▲33%溢</span></div>
     <div class="ms-str">★★★☆☆</div>
     <span class="ms-mn">Narrow 護城河</span></td>
-  <td><div class="mad ma-price">$210.73</div><div class="mad ma-tag">▼ 跌破 -5.0%</div></td><td><div class="mad ma-price">$218.67</div><div class="mad ma-tag">▼ 跌破 -8.4%</div></td><td><div class="mau ma-price">$186.58</div><div class="mau ma-tag">▲ 站上 +7.3%</div></td>
-  <td><div class="pe">77.0x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
-  <td><div class="fpe-dn" style="color:#3fb950">18.5x</div><div class="pe-note pos">↓ 獲利成長</div></td>
+  <td><div class="mad ma-price">$208.54</div><div class="mad ma-tag">▼ 跌破 -7.4%</div></td><td><div class="mad ma-price">$218.35</div><div class="mad ma-tag">▼ 跌破 -11.6%</div></td><td><div class="mau ma-price">$186.99</div><div class="mau ma-tag">▲ 站上 +3.2%</div></td>
+  <td><div class="pe">74.3x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
+  <td><div class="fpe-dn" style="color:#3fb950">17.8x</div><div class="pe-note pos">↓ 獲利成長</div></td>
   <td><div class="ivr-bg"><div class="ivr-f ivrl" style="width:0%"></div></div>
-    <div class="ivr-lbl">0.5% · IVR 0%</div></td>
+    <div class="ivr-lbl">1.3% · IVR 0%</div></td>
   <td><span class="ivb ivs">低 IVR</span></td>
   <td><div class="pc-r">1.34</div><div class="pc-l">避險需求</div></td>
-  <td class="mc">$326.4B</td>
+  <td class="mc">$314.8B</td>
 </tr>
 <tr>
   <td><div class="tk"><span class="tb">AVGO</span></div></td>
-  <td class="pr">$319.55</td>
+  <td class="pr">$311.62</td>
   <td class="oi"><div class="oi-lbl">本週 03-06</div>
-<div class="oi-call">▼ $315</div>
-<div class="oi-pain">⚡ $257.5</div>
-<div class="oi-put">▲ $165</div><div class="tz-wrap"><div style="color:#484f58;font-size:0.7em">目標：無訊號</div></div></td>
+<div class="oi-call">▼ $310</div>
+<div class="oi-pain">⚡ $310</div>
+<div class="oi-put">▲ $300</div><div class="tz-wrap"><div class="tz-call">🎯↑ $380</div><div class="tz-put">🎯↓ $250</div></div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $221M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:4%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下週 03-13</div>
-<div class="oi-call">▼ $315</div>
-<div class="oi-pain">⚡ $257.5</div>
-<div class="oi-put">▲ $165</div></td>
+<div class="oi-call">▼ $330</div>
+<div class="oi-pain">⚡ $320</div>
+<div class="oi-put">▲ $245</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $0M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:0%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下週 03-20<span style="font-size:0.65em;color:#e3b341;margin-left:3px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px">月結</span></div>
-<div class="oi-call">▼ $315</div>
-<div class="oi-pain">⚡ $260</div>
-<div class="oi-put">▲ $90</div></td>
+<div class="oi-call">▼ $400</div>
+<div class="oi-pain">⚡ $320</div>
+<div class="oi-put">▲ $240</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $1M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:0%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下下週 03-27</div>
-<div class="oi-call">▼ $315</div>
-<div class="oi-pain">⚡ $260</div>
-<div class="oi-put">▲ $195</div></td>
-  <td class="neg">-2.15</td><td class="neg pct">-0.67%</td>
-  <td>1.20x</td>
-  <td><div class="ms-fv">$258 <span class="ms-prem">▲24%溢</span></div>
+<div class="oi-call">▼ $400</div>
+<div class="oi-pain">⚡ $270</div>
+<div class="oi-put">▲ $280</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $0M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:0%"></div></div></td>
+  <td class="neg">-7.93</td><td class="neg pct">-2.48%</td>
+  <td>0.10x</td>
+  <td><div class="ms-fv">$258 <span class="ms-prem">▲21%溢</span></div>
     <div class="ms-str">★★★☆☆</div>
     <span class="ms-mw">Wide 護城河</span></td>
-  <td><div class="mad ma-price">$328.99</div><div class="mad ma-tag">▼ 跌破 -2.9%</div></td><td><div class="mad ma-price">$335.58</div><div class="mad ma-tag">▼ 跌破 -4.8%</div></td><td><div class="mau ma-price">$317.66</div><div class="mau ma-tag">▲ 站上 +0.6%</div></td>
-  <td><div class="pe">67.1x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
-  <td><div class="fpe-dn" style="color:#3fb950">22.0x</div><div class="pe-note pos">↓ 獲利成長</div></td>
+  <td><div class="mad ma-price">$328.01</div><div class="mad ma-tag">▼ 跌破 -5.0%</div></td><td><div class="mad ma-price">$335.00</div><div class="mad ma-tag">▼ 跌破 -7.0%</div></td><td><div class="mad ma-price">$318.07</div><div class="mad ma-tag">▼ 跌破 -2.0%</div></td>
+  <td><div class="pe">65.5x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
+  <td><div class="fpe-dn" style="color:#3fb950">21.4x</div><div class="pe-note pos">↓ 獲利成長</div></td>
   <td><div class="ivr-bg"><div class="ivr-f ivrl" style="width:0%"></div></div>
-    <div class="ivr-lbl">0.6% · IVR 0%</div></td>
+    <div class="ivr-lbl">0.3% · IVR 0%</div></td>
   <td><span class="ivb ivs">低 IVR</span></td>
   <td><div class="pc-n">0.89</div><div class="pc-l">中性</div></td>
-  <td class="mc">$1.52T</td>
+  <td class="mc">$1.48T</td>
 </tr>
 <tr>
   <td><div class="tk"><span class="tb">COST</span></div></td>
-  <td class="pr">$1010.79</td>
+  <td class="pr">$1015.00</td>
   <td class="oi"><div class="oi-lbl">本週 03-06</div>
-<div class="oi-call">▼ $992.5</div>
-<div class="oi-pain">⚡ $810</div>
-<div class="oi-put">▲ $540</div><div class="tz-wrap"><div style="color:#484f58;font-size:0.7em">目標：無訊號</div></div></td>
+<div class="oi-call">▼ $1050</div>
+<div class="oi-pain">⚡ $987.5</div>
+<div class="oi-put">▲ $925</div><div class="tz-wrap"><div class="tz-call">🎯↑ $1055</div><div class="tz-put">🎯↓ $920</div></div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $1,476,593M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:100%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下週 03-13</div>
-<div class="oi-call">▼ $992.5</div>
-<div class="oi-pain">⚡ $810</div>
-<div class="oi-put">▲ $540</div></td>
+<div class="oi-call">▼ $1050</div>
+<div class="oi-pain">⚡ $990</div>
+<div class="oi-put">▲ $950</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $61,329M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:100%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下週 03-20<span style="font-size:0.65em;color:#e3b341;margin-left:3px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px">月結</span></div>
-<div class="oi-call">▼ $1380</div>
-<div class="oi-pain">⚡ $810</div>
-<div class="oi-put">▲ $440</div></td>
+<div class="oi-call">▼ $1140</div>
+<div class="oi-pain">⚡ $950</div>
+<div class="oi-put">▲ $950</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#f85149">▼ $9,457M</div>
+<div style="font-size:0.65em;color:#f85149;margin-bottom:3px">Short γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#f85149;height:4px;border-radius:2px;width:100%"></div></div></td>
   <td class="oi"><div class="oi-lbl">下下下週 03-27</div>
-<div class="oi-call">▼ $995</div>
-<div class="oi-pain">⚡ $810</div>
-<div class="oi-put">▲ $570</div></td>
-  <td class="pos">+24.05</td><td class="pos pct">+2.44%</td>
-  <td><span class="vh">2.41x</span><span class="vb">放量</span></td>
-  <td><div class="ms-fv">$700 <span class="ms-prem">▲44%溢</span></div>
+<div class="oi-call">▼ $1020</div>
+<div class="oi-pain">⚡ $975</div>
+<div class="oi-put">▲ $950</div></td>
+  <td class="gex-td"><div style="font-size:0.65em;color:#484f58;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">GEX</div>
+<div style="font-family:monospace;font-size:0.88em;font-weight:700;color:#3fb950">▲ $5,206M</div>
+<div style="font-size:0.65em;color:#3fb950;margin-bottom:3px">Long γ</div>
+<div style="background:#21262d;border-radius:2px;height:4px;width:60px"><div style="background:#3fb950;height:4px;border-radius:2px;width:100%"></div></div></td>
+  <td class="pos">+4.21</td><td class="pos pct">+0.42%</td>
+  <td>0.09x</td>
+  <td><div class="ms-fv">$700 <span class="ms-prem">▲45%溢</span></div>
     <div class="ms-str">★★☆☆☆</div>
     <span class="ms-mw">Wide 護城河</span></td>
-  <td><div class="mau ma-price">$988.88</div><div class="mau ma-tag">▲ 站上 +2.2%</div></td><td><div class="mau ma-price">$942.53</div><div class="mau ma-tag">▲ 站上 +7.2%</div></td><td><div class="mau ma-price">$950.19</div><div class="mau ma-tag">▲ 站上 +6.4%</div></td>
-  <td><div class="pe">54.1x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
-  <td><div class="fpe-dn" style="color:#3fb950">45.3x</div><div class="pe-note pos">↓ 獲利成長</div></td>
+  <td><div class="mau ma-price">$992.62</div><div class="mau ma-tag">▲ 站上 +2.3%</div></td><td><div class="mau ma-price">$945.62</div><div class="mau ma-tag">▲ 站上 +7.3%</div></td><td><div class="mau ma-price">$950.28</div><div class="mau ma-tag">▲ 站上 +6.8%</div></td>
+  <td><div class="pe">54.3x</div><div class="pe-note" style="color:#484f58">TTM</div></td>
+  <td><div class="fpe-dn" style="color:#3fb950">45.5x</div><div class="pe-note pos">↓ 獲利成長</div></td>
   <td><div class="ivr-bg"><div class="ivr-f ivrl" style="width:0%"></div></div>
     <div class="ivr-lbl">0.1% · IVR 0%</div></td>
   <td><span class="ivb ivs">低 IVR</span></td>
   <td><div class="pc-r">1.06</div><div class="pc-l">避險需求</div></td>
-  <td class="mc">$448.7B</td>
+  <td class="mc">$450.6B</td>
 </tr>
 </tbody>
 </table>
@@ -673,38 +892,38 @@ td{padding:13px 14px;vertical-align:middle}
     <div class="mkc-hdr">
       <div><div class="mkc-tk">SPY</div><div class="mkc-sub">S&P 500 ETF</div></div>
       <div>
-        <div class="mkc-p">$685.99</div>
-        <div class="mkc-c neg" style="font-size:0.8em;text-align:right">-0.48%</div>
+        <div class="mkc-p">$681.9</div>
+        <div class="mkc-c neg" style="font-size:0.8em;text-align:right">-0.60%</div>
       </div>
     </div>
-    <div class="mkr"><span class="k">MA50</span><span class="v neg">$687.66 ▼ 跌破</span></div>
-    <div class="mkr"><span class="k">MA200</span><span class="v pos">$651.74 ▲ 站上</span></div>
+    <div class="mkr"><span class="k">MA50</span><span class="v neg">$687.76 ▼ 跌破</span></div>
+    <div class="mkr"><span class="k">MA200</span><span class="v pos">$652.24 ▲ 站上</span></div>
     <div style="margin-top:10px;border-top:1px solid #21262d;padding-top:10px">
       <div class="oi-lbl" style="margin-bottom:6px;letter-spacing:0.5px">期權 OI — 四週展望</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div style="background:#21262d;border-radius:6px;padding:7px 10px">
   <div class="oi-lbl">本週 03-06</div>
-  <div class="oi-call" style="font-size:0.85em">▼ $673</div>
-  <div class="oi-pain" style="font-size:0.85em">⚡ $550</div>
-  <div class="oi-put" style="font-size:0.85em">▲ $480</div>
+  <div class="oi-call" style="font-size:0.85em">▼ $700</div>
+  <div class="oi-pain" style="font-size:0.85em">⚡ $690</div>
+  <div class="oi-put" style="font-size:0.85em">▲ $645</div>
 </div>
 <div style="background:#21262d;border-radius:6px;padding:7px 10px">
   <div class="oi-lbl">下週 03-13</div>
-  <div class="oi-call" style="font-size:0.85em">▼ $673</div>
-  <div class="oi-pain" style="font-size:0.85em">⚡ $550</div>
-  <div class="oi-put" style="font-size:0.85em">▲ $480</div>
+  <div class="oi-call" style="font-size:0.85em">▼ $698</div>
+  <div class="oi-pain" style="font-size:0.85em">⚡ $685</div>
+  <div class="oi-put" style="font-size:0.85em">▲ $650</div>
 </div>
 <div style="background:#21262d;border-radius:6px;padding:7px 10px">
   <div class="oi-lbl">下下週 03-20<span style="font-size:0.6em;color:#e3b341;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px;margin-left:2px">月結</span></div>
-  <div class="oi-call" style="font-size:0.85em">▼ $673</div>
-  <div class="oi-pain" style="font-size:0.85em">⚡ $550</div>
-  <div class="oi-put" style="font-size:0.85em">▲ $245</div>
+  <div class="oi-call" style="font-size:0.85em">▼ $700</div>
+  <div class="oi-pain" style="font-size:0.85em">⚡ $685</div>
+  <div class="oi-put" style="font-size:0.85em">▲ $520</div>
 </div>
 <div style="background:#21262d;border-radius:6px;padding:7px 10px">
   <div class="oi-lbl">下下下週 03-27</div>
-  <div class="oi-call" style="font-size:0.85em">▼ $673</div>
-  <div class="oi-pain" style="font-size:0.85em">⚡ $550</div>
-  <div class="oi-put" style="font-size:0.85em">▲ $500</div>
+  <div class="oi-call" style="font-size:0.85em">▼ $730</div>
+  <div class="oi-pain" style="font-size:0.85em">⚡ $685</div>
+  <div class="oi-put" style="font-size:0.85em">▲ $620</div>
 </div>
       </div>
     </div>
@@ -714,38 +933,38 @@ td{padding:13px 14px;vertical-align:middle}
     <div class="mkc-hdr">
       <div><div class="mkc-tk">QQQ</div><div class="mkc-sub">Nasdaq 100 ETF</div></div>
       <div>
-        <div class="mkc-p">$607.29</div>
-        <div class="mkc-c neg" style="font-size:0.8em;text-align:right">-0.32%</div>
+        <div class="mkc-p">$603.44</div>
+        <div class="mkc-c neg" style="font-size:0.8em;text-align:right">-0.63%</div>
       </div>
     </div>
-    <div class="mkr"><span class="k">MA50</span><span class="v neg">$615.76 ▼ 跌破</span></div>
-    <div class="mkr"><span class="k">MA200</span><span class="v pos">$585.72 ▲ 站上</span></div>
+    <div class="mkr"><span class="k">MA50</span><span class="v neg">$615.61 ▼ 跌破</span></div>
+    <div class="mkr"><span class="k">MA200</span><span class="v pos">$586.17 ▲ 站上</span></div>
     <div style="margin-top:10px;border-top:1px solid #21262d;padding-top:10px">
       <div class="oi-lbl" style="margin-bottom:6px;letter-spacing:0.5px">期權 OI — 四週展望</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div style="background:#21262d;border-radius:6px;padding:7px 10px">
   <div class="oi-lbl">本週 03-06</div>
-  <div class="oi-call" style="font-size:0.85em">▼ $596</div>
-  <div class="oi-pain" style="font-size:0.85em">⚡ $490</div>
-  <div class="oi-put" style="font-size:0.85em">▲ $450</div>
+  <div class="oi-call" style="font-size:0.85em">▼ $660</div>
+  <div class="oi-pain" style="font-size:0.85em">⚡ $610</div>
+  <div class="oi-put" style="font-size:0.85em">▲ $585</div>
 </div>
 <div style="background:#21262d;border-radius:6px;padding:7px 10px">
   <div class="oi-lbl">下週 03-13</div>
-  <div class="oi-call" style="font-size:0.85em">▼ $596</div>
-  <div class="oi-pain" style="font-size:0.85em">⚡ $490</div>
-  <div class="oi-put" style="font-size:0.85em">▲ $450</div>
+  <div class="oi-call" style="font-size:0.85em">▼ $630</div>
+  <div class="oi-pain" style="font-size:0.85em">⚡ $606</div>
+  <div class="oi-put" style="font-size:0.85em">▲ $600</div>
 </div>
 <div style="background:#21262d;border-radius:6px;padding:7px 10px">
   <div class="oi-lbl">下下週 03-20<span style="font-size:0.6em;color:#e3b341;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px;margin-left:2px">月結</span></div>
-  <div class="oi-call" style="font-size:0.85em">▼ $596</div>
-  <div class="oi-pain" style="font-size:0.85em">⚡ $490</div>
-  <div class="oi-put" style="font-size:0.85em">▲ $205</div>
+  <div class="oi-call" style="font-size:0.85em">▼ $635</div>
+  <div class="oi-pain" style="font-size:0.85em">⚡ $606</div>
+  <div class="oi-put" style="font-size:0.85em">▲ $600</div>
 </div>
 <div style="background:#21262d;border-radius:6px;padding:7px 10px">
   <div class="oi-lbl">下下下週 03-27</div>
-  <div class="oi-call" style="font-size:0.85em">▼ $596</div>
-  <div class="oi-pain" style="font-size:0.85em">⚡ $490</div>
-  <div class="oi-put" style="font-size:0.85em">▲ $450</div>
+  <div class="oi-call" style="font-size:0.85em">▼ $650</div>
+  <div class="oi-pain" style="font-size:0.85em">⚡ $605</div>
+  <div class="oi-put" style="font-size:0.85em">▲ $550</div>
 </div>
       </div>
     </div>
@@ -755,8 +974,8 @@ td{padding:13px 14px;vertical-align:middle}
 
 <div class="ftr">
   ⚠️ 本報告數據來自 Yahoo Finance（yfinance），OI / Max Pain 為真實期權鏈計算，晨星估值為靜態手動更新。僅供參考，不構成投資建議。<br>
-  數據來源：Yahoo Finance · yfinance　｜　報告產生：2026-03-02 10:07 台灣時間<br>
-  <span style="color:#21262d">本機版 v5.0 · python3 stock_scan.py · 四週 OI · S5TW/S5FI</span>
+  數據來源：Yahoo Finance · yfinance　｜　報告產生：2026-03-02 14:42 台灣時間<br>
+  <span style="color:#21262d">本機版 v5.0 · python3 stock_scan.py · 四週 OI + GEX</span>
 </div>
 
 </div>
