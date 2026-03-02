@@ -378,7 +378,9 @@ def fetch_stock(ticker):
                         result['put_wall'] = float(puts_below_oi.loc[puts_below_oi['openInterest'].idxmax(), 'strike'])
 
             # Max Pain（傳入現價做範圍過濾）
-            result['max_pain'] = calc_max_pain(calls, puts, current_price=price)
+            mp_val = calc_max_pain(calls, puts, current_price=price)
+            result['max_pain'] = mp_val
+            print(f'      → Max Pain debug: calls={len(calls)}筆 puts={len(puts)}筆 result={mp_val}')
 
             return result, calls, puts  # 永遠回傳 3-tuple
 
