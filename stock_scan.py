@@ -349,29 +349,35 @@ def fetch_stock(ticker):
                             c = calls_df.copy()
                             c['volume'] = pd.to_numeric(c['volume'], errors='coerce').fillna(0)
                             c['openInterest'] = pd.to_numeric(c['openInterest'], errors='coerce').fillna(0)
-                            otm_calls = c[(c['strike'] > price * 1.01) & (c['strike'] <= price * 1.30) & (c['openInterest'] > 50)]
+                            otm_calls = c[(c['strike'] > price * 1.01) & (c['strike'] <= price * 1.30) & (c['openInterest'] > 0)]
                             if not otm_calls.empty:
                                 otm_calls = otm_calls.copy()
-                                otm_calls['score'] = (otm_calls['volume'] / otm_calls['openInterest']) * (otm_calls['volume'] ** 0.5)
+                                if otm_calls['volume'].sum() > 0:
+                                    otm_calls['score'] = (otm_calls['volume'] / otm_calls['openInterest']) * (otm_calls['volume'] ** 0.5)
+                                else:
+                                    otm_calls['score'] = otm_calls['openInterest']
                                 best_c = otm_calls.loc[otm_calls['score'].idxmax()]
                                 d['target_call_strike'] = float(best_c['strike'])
                                 d['target_call_expiry'] = expiry_str
 
-                            # 最強 OTM Put（現價 -1% ~ -30%，OI > 50）
+                            # 最強 OTM Put（現價 -1% ~ -30%，OI > 0）
                             p = puts_df.copy()
                             p['volume'] = pd.to_numeric(p['volume'], errors='coerce').fillna(0)
                             p['openInterest'] = pd.to_numeric(p['openInterest'], errors='coerce').fillna(0)
-                            otm_puts = p[(p['strike'] < price * 0.99) & (p['strike'] >= price * 0.70) & (p['openInterest'] > 50)]
+                            otm_puts = p[(p['strike'] < price * 0.99) & (p['strike'] >= price * 0.70) & (p['openInterest'] > 0)]
                             if not otm_puts.empty:
                                 otm_puts = otm_puts.copy()
-                                otm_puts['score'] = (otm_puts['volume'] / otm_puts['openInterest']) * (otm_puts['volume'] ** 0.5)
+                                if otm_puts['volume'].sum() > 0:
+                                    otm_puts['score'] = (otm_puts['volume'] / otm_puts['openInterest']) * (otm_puts['volume'] ** 0.5)
+                                else:
+                                    otm_puts['score'] = otm_puts['openInterest']
                                 best_p = otm_puts.loc[otm_puts['score'].idxmax()]
                                 d['target_put_strike'] = float(best_p['strike'])
                                 d['target_put_expiry'] = expiry_str
 
                             print(f'    機構目標 Call:{d["target_call_strike"]}  Put:{d["target_put_strike"]}')
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            print(f"    機構目標錯誤: {e}")
 
                 except Exception as e:
                     print(f'    {wk_info["label"]}期權錯誤 {ticker}: {e}')
