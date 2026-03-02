@@ -299,10 +299,16 @@ def fetch_stock(ticker):
         d['iv']       = None
         d['ivr']      = None
         d['pc_ratio'] = None
-        # 當週機構押注目標（高/低各一）
-        d['target_call_strike'] = None  # 最強 OTM Call Strike
+        # 四週 OTM 目標
+        for _wk in ['w0', 'w1', 'w2', 'w3']:
+            d[f'{_wk}_target_call_strike'] = None
+            d[f'{_wk}_target_call_expiry'] = None
+            d[f'{_wk}_target_put_strike']  = None
+            d[f'{_wk}_target_put_expiry']  = None
+        # 舊 key 相容
+        d['target_call_strike'] = None
         d['target_call_expiry'] = None
-        d['target_put_strike']  = None  # 最強 OTM Put Strike
+        d['target_put_strike']  = None
         d['target_put_expiry']  = None
 
         def _fetch_oi(target_expiry_str, available_dates):
@@ -362,44 +368,49 @@ def fetch_stock(ticker):
                     monthly_note = '★月結' if wk_info['is_monthly'] else ''
                     print(f'    {wk_info["label"]}{monthly_note} ({d[f"{k}_expiry"]})  Put牆:{d[f"{k}_put_wall"]}  Pain:{d[f"{k}_max_pain"]}  Call牆:{d[f"{k}_call_wall"]}')
 
-                    # ── 當週機構押注目標（高/低各一）─────────────
-                    if i == 0:
-                        try:
-                            expiry_str = res.get('expiry', '')
+                    # ── 四週 OTM 目標 ────────────────────────────
+                    try:
+                        expiry_str = res.get('expiry', '')
+                        wpfx = WEEK_KEYS[i] + '_'
 
-                            # 最強 OTM Call（現價 +1% ~ +30%，OI > 50）
-                            c = calls_df.copy()
-                            c['volume'] = pd.to_numeric(c['volume'], errors='coerce').fillna(0)
-                            c['openInterest'] = pd.to_numeric(c['openInterest'], errors='coerce').fillna(0)
-                            otm_calls = c[(c['strike'] > price * 1.01) & (c['strike'] <= price * 1.30) & (c['openInterest'] > 0)]
-                            if not otm_calls.empty:
-                                otm_calls = otm_calls.copy()
-                                if otm_calls['volume'].sum() > 0:
-                                    otm_calls['score'] = (otm_calls['volume'] / otm_calls['openInterest']) * (otm_calls['volume'] ** 0.5)
-                                else:
-                                    otm_calls['score'] = otm_calls['openInterest']
-                                best_c = otm_calls.loc[otm_calls['score'].idxmax()]
-                                d['target_call_strike'] = float(best_c['strike'])
+                        c = calls_df.copy()
+                        c['volume'] = pd.to_numeric(c['volume'], errors='coerce').fillna(0)
+                        c['openInterest'] = pd.to_numeric(c['openInterest'], errors='coerce').fillna(0)
+                        otm_calls = c[(c['strike'] > price * 1.01) & (c['strike'] <= price * 1.30) & (c['openInterest'] > 0)]
+                        if not otm_calls.empty:
+                            otm_calls = otm_calls.copy()
+                            if otm_calls['volume'].sum() > 0:
+                                otm_calls['score'] = (otm_calls['volume'] / otm_calls['openInterest']) * (otm_calls['volume'] ** 0.5)
+                            else:
+                                otm_calls['score'] = otm_calls['openInterest']
+                            best_c = otm_calls.loc[otm_calls['score'].idxmax()]
+                            d[f'{wpfx}target_call_strike'] = float(best_c['strike'])
+                            d[f'{wpfx}target_call_expiry'] = expiry_str
+                            if i == 0:
+                                d['target_call_strike'] = d[f'{wpfx}target_call_strike']
                                 d['target_call_expiry'] = expiry_str
 
-                            # 最強 OTM Put（現價 -1% ~ -30%，OI > 0）
-                            p = puts_df.copy()
-                            p['volume'] = pd.to_numeric(p['volume'], errors='coerce').fillna(0)
-                            p['openInterest'] = pd.to_numeric(p['openInterest'], errors='coerce').fillna(0)
-                            otm_puts = p[(p['strike'] < price * 0.99) & (p['strike'] >= price * 0.70) & (p['openInterest'] > 0)]
-                            if not otm_puts.empty:
-                                otm_puts = otm_puts.copy()
-                                if otm_puts['volume'].sum() > 0:
-                                    otm_puts['score'] = (otm_puts['volume'] / otm_puts['openInterest']) * (otm_puts['volume'] ** 0.5)
-                                else:
-                                    otm_puts['score'] = otm_puts['openInterest']
-                                best_p = otm_puts.loc[otm_puts['score'].idxmax()]
-                                d['target_put_strike'] = float(best_p['strike'])
+                        p = puts_df.copy()
+                        p['volume'] = pd.to_numeric(p['volume'], errors='coerce').fillna(0)
+                        p['openInterest'] = pd.to_numeric(p['openInterest'], errors='coerce').fillna(0)
+                        otm_puts = p[(p['strike'] < price * 0.99) & (p['strike'] >= price * 0.70) & (p['openInterest'] > 0)]
+                        if not otm_puts.empty:
+                            otm_puts = otm_puts.copy()
+                            if otm_puts['volume'].sum() > 0:
+                                otm_puts['score'] = (otm_puts['volume'] / otm_puts['openInterest']) * (otm_puts['volume'] ** 0.5)
+                            else:
+                                otm_puts['score'] = otm_puts['openInterest']
+                            best_p = otm_puts.loc[otm_puts['score'].idxmax()]
+                            d[f'{wpfx}target_put_strike'] = float(best_p['strike'])
+                            d[f'{wpfx}target_put_expiry'] = expiry_str
+                            if i == 0:
+                                d['target_put_strike'] = d[f'{wpfx}target_put_strike']
                                 d['target_put_expiry'] = expiry_str
 
-                            print(f'    機構目標 Call:{d["target_call_strike"]}  Put:{d["target_put_strike"]}')
-                        except Exception as e:
-                            print(f"    機構目標錯誤: {e}")
+                        labels = ['本週', '下週', '下下週', '下下下週']
+                        print(f'    {labels[i]}OTM目標 Call:{d[f"{wpfx}target_call_strike"]}  Put:{d[f"{wpfx}target_put_strike"]}')
+                    except Exception as e:
+                        print(f"    OTM目標錯誤[{i}]: {e}")
 
                 except Exception as e:
                     print(f'    {wk_info["label"]}期權錯誤 {ticker}: {e}')
@@ -597,12 +608,12 @@ def ms_html(ticker, price):
     <span class="{moat_cls}">{moat_txt}</span>'''
 
 
-def target_zone_html(d):
-    """渲染當週機構押注目標（高/低各一）"""
-    cs = d.get('target_call_strike')
-    ce = d.get('target_call_expiry', '') or ''
-    ps = d.get('target_put_strike')
-    pe = d.get('target_put_expiry', '') or ''
+def target_zone_html(d, pfx='w0_'):
+    """渲染 OTM 押注目標，pfx='w0_'~'w3_'"""
+    cs = d.get(f'{pfx}target_call_strike')
+    ce = d.get(f'{pfx}target_call_expiry', '') or ''
+    ps = d.get(f'{pfx}target_put_strike')
+    pe = d.get(f'{pfx}target_put_expiry', '') or ''
 
     if cs is None and ps is None:
         return '<div class="tz-wrap"><div style="color:#484f58;font-size:0.7em">目標：無訊號</div></div>'
@@ -714,10 +725,10 @@ def stock_row(d):
     pc_h = pc_html(d['pc_ratio'])
 
     # OI 四欄
-    oi_w0_h = oi_html_single(d, 'w0') + target_zone_html(d)
-    oi_w1_h = oi_html_single(d, 'w1')
-    oi_w2_h = oi_html_single(d, 'w2')
-    oi_w3_h = oi_html_single(d, 'w3')
+    oi_w0_h = oi_html_single(d, 'w0') + target_zone_html(d, 'w0_')
+    oi_w1_h = oi_html_single(d, 'w1') + target_zone_html(d, 'w1_')
+    oi_w2_h = oi_html_single(d, 'w2') + target_zone_html(d, 'w2_')
+    oi_w3_h = oi_html_single(d, 'w3') + target_zone_html(d, 'w3_')
     gex_w0_h = gex_html_single(d, 'w0')
     gex_w1_h = gex_html_single(d, 'w1')
     gex_w2_h = gex_html_single(d, 'w2')
