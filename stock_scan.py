@@ -322,12 +322,12 @@ def fetch_stock(ticker):
             result = {'expiry': best}
 
             # Put Wall（現價以下 OI 最大的 Put strike）
-            puts_below = puts[puts['strike'] <= price * 1.02]
+            puts_below = puts[(puts['strike'] <= price * 1.02) & (puts['strike'] >= price * 0.70)]
             if not puts_below.empty:
                 result['put_wall'] = float(puts_below.loc[puts_below['openInterest'].idxmax(), 'strike'])
 
             # Call Wall（現價以上 OI 最大的 Call strike）
-            calls_above = calls[calls['strike'] >= price * 0.98]
+            calls_above = calls[(calls['strike'] >= price * 0.98) & (calls['strike'] <= price * 1.30)]
             if not calls_above.empty:
                 result['call_wall'] = float(calls_above.loc[calls_above['openInterest'].idxmax(), 'strike'])
 
@@ -473,10 +473,10 @@ def fetch_spy_qqq():
                 calls['openInterest'] = pd.to_numeric(calls['openInterest'], errors='coerce').fillna(0)
                 puts['openInterest']  = pd.to_numeric(puts['openInterest'],  errors='coerce').fillna(0)
                 res = {'expiry': best}
-                puts_below = puts[puts['strike'] <= price * 1.02]
+                puts_below = puts[(puts['strike'] <= price * 1.02) & (puts['strike'] >= price * 0.70)]
                 if not puts_below.empty:
                     res['put_wall'] = float(puts_below.loc[puts_below['openInterest'].idxmax(), 'strike'])
-                calls_above = calls[calls['strike'] >= price * 0.98]
+                calls_above = calls[(calls['strike'] >= price * 0.98) & (calls['strike'] <= price * 1.30)]
                 if not calls_above.empty:
                     res['call_wall'] = float(calls_above.loc[calls_above['openInterest'].idxmax(), 'strike'])
                 res['max_pain'] = calc_max_pain(calls, puts, current_price=price)
