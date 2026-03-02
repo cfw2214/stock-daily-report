@@ -14,23 +14,6 @@ import os
 import sys
 from datetime import datetime, timedelta
 
-# Black-Scholes Gamma 計算（不需要 scipy，純 math）
-def _bs_gamma(S, K, T, sigma, r=0.045):
-    """
-    計算 Black-Scholes Gamma。
-    S = 現價, K = Strike, T = 到期年數, sigma = IV, r = 無風險利率
-    Call 和 Put 的 Gamma 相同。
-    """
-    if T <= 0 or sigma <= 0 or S <= 0 or K <= 0:
-        return 0.0
-    try:
-        d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * math.sqrt(T))
-        # 標準常態 PDF
-        phi = math.exp(-0.5 * d1 * d1) / math.sqrt(2 * math.pi)
-        return phi / (S * sigma * math.sqrt(T))
-    except Exception:
-        return 0.0
-
 # ═══════════════════════════════════════════════════════════════
 #  設定區 — 依需求修改
 # ═══════════════════════════════════════════════════════════════
@@ -124,32 +107,29 @@ def calc_max_pain(calls_df, puts_df, current_price=None):
     """計算 Max Pain：option writers 受益最多的 strike 價格。
     改進：
       1. 只計算現價 ±20% 以內的 strike（過濾遠 OTM 雜訊）
-      2. 過濾 OI < 50 口的 strike（低流動性），若資料不足退回 OI >= 1
+      2. 過濾 OI < 50 口的 strike（低流動性）
     """
     try:
         c = calls_df.copy()
         p = puts_df.copy()
 
-        # 過濾遠 OTM（現價 ±20%）先做，縮小範圍
+        # 過濾低 OI
+        c = c[c['openInterest'] >= 50]
+        p = p[p['openInterest'] >= 50]
+
+        # 過濾遠 OTM（現價 ±20%）
         if current_price and current_price > 0:
             lo = current_price * 0.80
             hi = current_price * 1.20
             c = c[(c['strike'] >= lo) & (c['strike'] <= hi)]
             p = p[(p['strike'] >= lo) & (p['strike'] <= hi)]
 
-        # 過濾低 OI，若過濾後無資料則降低門檻
-        for min_oi in [50, 10, 1]:
-            c_f = c[c['openInterest'] >= min_oi]
-            p_f = p[p['openInterest'] >= min_oi]
-            all_strikes = sorted(set(c_f['strike'].tolist() + p_f['strike'].tolist()))
-            if all_strikes:
-                break
-
+        all_strikes = sorted(set(c['strike'].tolist() + p['strike'].tolist()))
         if not all_strikes:
             return None
 
-        calls_map = dict(zip(c_f['strike'], c_f['openInterest'].fillna(0)))
-        puts_map  = dict(zip(p_f['strike'], p_f['openInterest'].fillna(0)))
+        calls_map = dict(zip(c['strike'], c['openInterest'].fillna(0)))
+        puts_map  = dict(zip(p['strike'], p['openInterest'].fillna(0)))
 
         min_pain = float('inf')
         max_pain_strike = all_strikes[len(all_strikes) // 2]
@@ -336,10 +316,10 @@ def fetch_stock(ticker):
             if not calls_above.empty:
                 result['call_wall'] = float(calls_above.loc[calls_above['openInterest'].idxmax(), 'strike'])
 
-            # Max Pain
+            # Max Pain（傳入現價做範圍過濾）
             result['max_pain'] = calc_max_pain(calls, puts, current_price=price)
 
-            return result, calls, puts
+            return result, calls, puts  # 永遠回傳 3-tuple
 
         # 初始化 — 避免 NameError
         last_calls = None
