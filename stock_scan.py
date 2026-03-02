@@ -284,6 +284,11 @@ def fetch_stock(ticker):
         d['iv']       = None
         d['ivr']      = None
         d['pc_ratio'] = None
+        # 機構目標（四週最強 OTM vol/OI 單一訊號）
+        d['target_strike']    = None   # 最強訊號的 Strike
+        d['target_expiry']    = None   # 到期日
+        d['target_direction'] = None   # 'CALL' or 'PUT'
+        d['target_score']     = 0.0
 
         def _fetch_oi(target_expiry_str, available_dates):
             """通用：找最接近 target_expiry_str 的到期日並抓 OI。
@@ -340,6 +345,42 @@ def fetch_stock(ticker):
                     last_puts  = puts_df
                     monthly_note = '★月結' if wk_info['is_monthly'] else ''
                     print(f'    {wk_info["label"]}{monthly_note} ({d[f"{k}_expiry"]})  Put牆:{d[f"{k}_put_wall"]}  Pain:{d[f"{k}_max_pain"]}  Call牆:{d[f"{k}_call_wall"]}')
+
+                    # ── 機構目標：找四週最強 OTM vol/OI 單一訊號 ──────
+                    try:
+                        expiry_str = res.get('expiry', '')
+
+                        # OTM Call：現價以上 1%~30%
+                        c = calls_df.copy()
+                        c['volume'] = pd.to_numeric(c['volume'], errors='coerce').fillna(0)
+                        c['openInterest'] = pd.to_numeric(c['openInterest'], errors='coerce').fillna(0)
+                        otm_calls = c[(c['strike'] > price * 1.01) & (c['strike'] <= price * 1.30) & (c['openInterest'] > 50)]
+                        if not otm_calls.empty:
+                            otm_calls = otm_calls.copy()
+                            otm_calls['score'] = (otm_calls['volume'] / otm_calls['openInterest']) * (otm_calls['volume'] ** 0.5)
+                            best_c = otm_calls.loc[otm_calls['score'].idxmax()]
+                            if float(best_c['score']) > d['target_score']:
+                                d['target_strike']    = float(best_c['strike'])
+                                d['target_expiry']    = expiry_str
+                                d['target_direction'] = 'CALL'
+                                d['target_score']     = float(best_c['score'])
+
+                        # OTM Put：現價以下 1%~30%
+                        p = puts_df.copy()
+                        p['volume'] = pd.to_numeric(p['volume'], errors='coerce').fillna(0)
+                        p['openInterest'] = pd.to_numeric(p['openInterest'], errors='coerce').fillna(0)
+                        otm_puts = p[(p['strike'] < price * 0.99) & (p['strike'] >= price * 0.70) & (p['openInterest'] > 50)]
+                        if not otm_puts.empty:
+                            otm_puts = otm_puts.copy()
+                            otm_puts['score'] = (otm_puts['volume'] / otm_puts['openInterest']) * (otm_puts['volume'] ** 0.5)
+                            best_p = otm_puts.loc[otm_puts['score'].idxmax()]
+                            if float(best_p['score']) > d['target_score']:
+                                d['target_strike']    = float(best_p['strike'])
+                                d['target_expiry']    = expiry_str
+                                d['target_direction'] = 'PUT'
+                                d['target_score']     = float(best_p['score'])
+                    except Exception:
+                        pass
 
                 except Exception as e:
                     print(f'    {wk_info["label"]}期權錯誤 {ticker}: {e}')
@@ -537,6 +578,23 @@ def ms_html(ticker, price):
     <span class="{moat_cls}">{moat_txt}</span>'''
 
 
+def target_zone_html(d):
+    """渲染機構目標（四週最強 OTM vol/OI 單一訊號）"""
+    strike = d.get('target_strike')
+    expiry = d.get('target_expiry', '') or ''
+    direction = d.get('target_direction')
+
+    if strike is None:
+        return '<div style="color:#484f58;font-size:0.7em;margin-top:5px">目標：無訊號</div>'
+
+    exp_short = expiry[5:] if len(expiry) >= 7 else expiry  # MM-DD
+
+    if direction == 'CALL':
+        return f'<div class="tz-wrap"><div class="tz-call">🎯↑ ${strike:g} <span class="tz-exp">({exp_short})</span></div></div>'
+    else:
+        return f'<div class="tz-wrap"><div class="tz-put">🎯↓ ${strike:g} <span class="tz-exp">({exp_short})</span></div></div>'
+
+
 def oi_html_single(d, pfx, label=''):
     """單一到期期別的 OI 格，pfx='w0'~'w3'"""
     cw    = d.get(f'{pfx}_call_wall')
@@ -609,7 +667,7 @@ def stock_row(d):
     pc_h = pc_html(d['pc_ratio'])
 
     # OI 四欄
-    oi_w0_h = oi_html_single(d, 'w0')
+    oi_w0_h = oi_html_single(d, 'w0') + target_zone_html(d)
     oi_w1_h = oi_html_single(d, 'w1')
     oi_w2_h = oi_html_single(d, 'w2')
     oi_w3_h = oi_html_single(d, 'w3')
@@ -803,11 +861,15 @@ td{{padding:13px 14px;vertical-align:middle}}
 .ivr-f{{height:100%;border-radius:3px}}
 .ivrl{{background:#3fb950}}.ivrm{{background:#d29922}}.ivrh{{background:#f85149}}
 .ivr-lbl{{font-size:0.75em;color:#8b949e}}
-.oi{{min-width:110px;max-width:130px}}
+.oi{{min-width:110px;max-width:140px}}
 .oi-lbl{{font-size:0.7em;color:#484f58;margin-bottom:3px;letter-spacing:0.5px;text-transform:uppercase}}
 .oi-call{{font-family:monospace;font-size:0.92em;color:#f85149;white-space:nowrap}}
 .oi-pain{{font-family:monospace;font-size:0.92em;color:#d29922;white-space:nowrap;margin:3px 0}}
 .oi-put{{font-family:monospace;font-size:0.92em;color:#3fb950;white-space:nowrap}}
+.tz-wrap{{margin-top:6px;padding-top:5px;border-top:1px dashed #30363d}}
+.tz-call{{font-family:monospace;font-size:0.82em;color:#a371f7;white-space:nowrap}}
+.tz-put{{font-family:monospace;font-size:0.82em;color:#79c0ff;white-space:nowrap;margin-top:2px}}
+.tz-exp{{font-size:0.85em;color:#484f58}}
 .ms-fv{{font-family:monospace;font-size:0.95em;font-weight:700;color:#e6edf3}}
 .ms-disc{{font-size:0.78em;color:#3fb950;font-weight:600}}
 .ms-prem{{font-size:0.78em;color:#f85149;font-weight:600}}
@@ -892,6 +954,7 @@ td{{padding:13px 14px;vertical-align:middle}}
   <span class="oi-pain">⚡ Max Pain</span> = 最大痛苦點
   <span class="oi-put">▲ Put Wall</span> = 支撐　｜　<span style="color:#e3b341">月結</span> = 當月第三週五
   <span>｜</span>
+  <span style="color:#a371f7">🎯↑</span> = 機構最強 OTM Call 押注目標　<span style="color:#79c0ff">🎯↓</span> = 機構最強 OTM Put 押注目標　（括號為到期日，四週取最強）
 
 </div>
 
