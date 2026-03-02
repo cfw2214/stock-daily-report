@@ -105,17 +105,11 @@ def get_monthly_expiry():
 
 def calc_max_pain(calls_df, puts_df, current_price=None):
     """計算 Max Pain：option writers 受益最多的 strike 價格。
-    改進：
-      1. 只計算現價 ±20% 以內的 strike（過濾遠 OTM 雜訊）
-      2. 過濾 OI < 50 口的 strike（低流動性）
+    只過濾現價 ±20% 以外的遠 OTM，不濾 OI（非交易時段 OI 常為 0）
     """
     try:
         c = calls_df.copy()
         p = puts_df.copy()
-
-        # 過濾低 OI
-        c = c[c['openInterest'] >= 50]
-        p = p[p['openInterest'] >= 50]
 
         # 過濾遠 OTM（現價 ±20%）
         if current_price and current_price > 0:
