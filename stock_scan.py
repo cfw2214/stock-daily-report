@@ -329,12 +329,21 @@ def fetch_stock(ticker):
             T = max((expiry_dt - today).days / 365.0, 1/365)
 
             # ── Gamma Wall（取代 OI Wall）────────────────────
-            # 每個 Strike 的 GEX = Gamma(BS) × OI × 100
-            # Call GEX 正，Put GEX 負（做市商視角）
             def add_gex(df, is_call):
                 df = df.copy()
-                df['iv']  = pd.to_numeric(df.get('impliedVolatility', 0), errors='coerce').fillna(0)
-                df['oi']  = pd.to_numeric(df['openInterest'], errors='coerce').fillna(0)
+                # 修正：欄位不存在時用 Series 而非整數 0
+                if 'impliedVolatility' in df.columns:
+                    iv_raw = pd.to_numeric(df['impliedVolatility'], errors='coerce')
+                else:
+                    iv_raw = pd.Series([0.0] * len(df), index=df.index)
+
+                # IV=0 的列，用同一到期日所有有效 IV 的中位數補值
+                iv_median = iv_raw[iv_raw > 0.01].median()
+                if pd.isna(iv_median) or iv_median <= 0:
+                    iv_median = 0.50  # 最終 fallback：假設 50% IV
+                df['iv'] = iv_raw.where(iv_raw > 0.01, iv_median)
+
+                df['oi']    = pd.to_numeric(df['openInterest'], errors='coerce').fillna(0)
                 df['gamma'] = df.apply(
                     lambda r: _bs_gamma(price, r['strike'], T, r['iv']), axis=1)
                 df['gex'] = df['gamma'] * df['oi'] * 100
@@ -345,18 +354,28 @@ def fetch_stock(ticker):
             calls_g = add_gex(calls, is_call=True)
             puts_g  = add_gex(puts,  is_call=False)
 
-            # Call Gamma Wall：現價以上，GEX 最大的 Strike（正 GEX 最大 = 最強壓力）
+            # Call Gamma Wall：現價以上，GEX 最大的 Strike
             calls_above = calls_g[calls_g['strike'] >= price * 0.98]
             if not calls_above.empty and calls_above['gex'].max() > 0:
                 result['call_wall'] = float(calls_above.loc[calls_above['gex'].idxmax(), 'strike'])
+            else:
+                # Fallback：退回用 OI 最大
+                calls_above_oi = calls[calls['strike'] >= price * 0.98]
+                if not calls_above_oi.empty:
+                    result['call_wall'] = float(calls_above_oi.loc[calls_above_oi['openInterest'].idxmax(), 'strike'])
 
-            # Put Gamma Wall：現價以下，|GEX| 最大的 Strike（負 GEX 絕對值最大 = 最強支撐）
+            # Put Gamma Wall：現價以下，|GEX| 最大的 Strike
             puts_below = puts_g[puts_g['strike'] <= price * 1.02]
             if not puts_below.empty:
                 puts_below = puts_below.copy()
                 puts_below['abs_gex'] = puts_below['gex'].abs()
                 if puts_below['abs_gex'].max() > 0:
                     result['put_wall'] = float(puts_below.loc[puts_below['abs_gex'].idxmax(), 'strike'])
+                else:
+                    # Fallback：退回用 OI 最大
+                    puts_below_oi = puts[puts['strike'] <= price * 1.02]
+                    if not puts_below_oi.empty:
+                        result['put_wall'] = float(puts_below_oi.loc[puts_below_oi['openInterest'].idxmax(), 'strike'])
 
             # Max Pain（傳入現價做範圍過濾）
             result['max_pain'] = calc_max_pain(calls, puts, current_price=price)
@@ -499,7 +518,14 @@ def fetch_spy_qqq():
 
                 def add_gex_etf(df, is_call):
                     df = df.copy()
-                    df['iv']    = pd.to_numeric(df.get('impliedVolatility', 0), errors='coerce').fillna(0)
+                    if 'impliedVolatility' in df.columns:
+                        iv_raw = pd.to_numeric(df['impliedVolatility'], errors='coerce')
+                    else:
+                        iv_raw = pd.Series([0.0] * len(df), index=df.index)
+                    iv_median = iv_raw[iv_raw > 0.01].median()
+                    if pd.isna(iv_median) or iv_median <= 0:
+                        iv_median = 0.20  # ETF fallback：假設 20% IV（SPY/QQQ 較低）
+                    df['iv']    = iv_raw.where(iv_raw > 0.01, iv_median)
                     df['oi']    = pd.to_numeric(df['openInterest'], errors='coerce').fillna(0)
                     df['gamma'] = df.apply(lambda r: _bs_gamma(price, r['strike'], T, r['iv']), axis=1)
                     df['gex']   = df['gamma'] * df['oi'] * 100
@@ -513,6 +539,10 @@ def fetch_spy_qqq():
                 calls_above = calls_g[calls_g['strike'] >= price * 0.98]
                 if not calls_above.empty and calls_above['gex'].max() > 0:
                     res['call_wall'] = float(calls_above.loc[calls_above['gex'].idxmax(), 'strike'])
+                else:
+                    calls_above_oi = calls[calls['strike'] >= price * 0.98]
+                    if not calls_above_oi.empty:
+                        res['call_wall'] = float(calls_above_oi.loc[calls_above_oi['openInterest'].idxmax(), 'strike'])
 
                 puts_below = puts_g[puts_g['strike'] <= price * 1.02]
                 if not puts_below.empty:
@@ -520,6 +550,10 @@ def fetch_spy_qqq():
                     puts_below['abs_gex'] = puts_below['gex'].abs()
                     if puts_below['abs_gex'].max() > 0:
                         res['put_wall'] = float(puts_below.loc[puts_below['abs_gex'].idxmax(), 'strike'])
+                    else:
+                        puts_below_oi = puts[puts['strike'] <= price * 1.02]
+                        if not puts_below_oi.empty:
+                            res['put_wall'] = float(puts_below_oi.loc[puts_below_oi['openInterest'].idxmax(), 'strike'])
 
                 res['max_pain'] = calc_max_pain(calls, puts, current_price=price)
                 return res, calls, puts
