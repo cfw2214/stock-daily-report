@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-美股每日開盤掃描報告 Powered by 黑叔 — v5.2
+美股每日開盤掃描報告 Powered by 黑叔 — v6.11
 量比 + EMA15/50/100 合併欄 | SPY/QQQ EMA技術分析建議
 使用 yfinance 抓取真實股價、期權 OI、IV、P/C Ratio、EMA 數據
 執行方式：python3 stock_scan.py
@@ -19,10 +19,30 @@ from datetime import datetime, timedelta
 #  設定區 — 依需求修改
 # ═══════════════════════════════════════════════════════════════
 
-TICKERS = ['NVDA', 'GOOGL', 'AAPL', 'MSFT', 'AMZN', 'META', 'TSLA',
-           'TSM', 'AMD', 'MU', 'AVGO', 'SNDK', 'NFLX', 'LITE', 'COHR']
+TICKERS = ['NVDA', 'GOOGL', 'AAPL', 'TSM', 'MSFT', 'AMZN', 'META', 'TSLA',
+           'AMD', 'MU', 'AVGO', 'SNDK', 'NFLX', 'LITE', 'COHR', 'JPM']
 
 MAG7 = {'AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'META', 'TSLA'}
+
+# 每股建議觀察重點（顯示在股價欄下方）
+STOCK_TIPS = {
+    'TSLA':  ('gex',      '🔆 GEX',       '觀察做市商 Gamma 方向，Short γ 時波動放大'),
+    'AAPL':  ('maxpain',  '⚡ Max Pain',   '價格磁吸力強，結算易回歸 Max Pain'),
+    'AMD':   ('oi',       '📊 OI',         '關注 Put/Call Wall OI 集中點，決定支撐壓力'),
+    'MSFT':  ('sellzone', '📤 Sell Zone',  '回測驗證 Sell Zone 為有效盤中出場點'),
+    'GOOGL': ('wall',     '🧱 C/P Wall',   '關注 Call Wall 壓力與 Put Wall 支撐位'),
+    'NFLX':  ('oi',       '📊 OI',         '流動性集中，OI Wall 為盤中關鍵翻轉點'),
+    'AVGO':  ('sellzone', '📤 Sell Zone',  '多頭格局下 Sell Zone 為理想短線獲利出場'),
+    'NVDA':  ('buyzone',  '📥 Buy Zone',   '回測勝率高，5 批分買策略有效性最強'),
+    'TSM':   ('putwall',  '🛡 Put Wall',   'Put Wall OI 厚實，為短線重要下方支撐'),
+    'META':  ('maxpain',  '⚡ Max Pain',   '結算收盤常回歸 Max Pain，週五磁吸明顯'),
+    'AMZN':  ('ema',      '📐 EMA',        'EMA15/50 為趨勢判斷關鍵，注意均線交叉'),
+    'MU':    ('iv',       '📈 IV/IVR',     'IV 波動大，IVR 高時賣方策略優先'),
+    'SNDK':  ('oi',       '📊 OI',         'OI 集中點明確，可做為盤中方向參考'),
+    'LITE':  ('ema',      '📐 EMA',        '趨勢跟蹤為主，EMA 排列決定多空方向'),
+    'COHR':  ('ema',      '📐 EMA',        '中低流動性，EMA 為最可靠技術參考'),
+    'JPM':   ('wall',     '🧱 C/P Wall',   '金融股期權 Wall 效果顯著，注意財報周風險'),
+}
 
 MORNINGSTAR = {
     'AAPL':  {'fv': 260,  'stars': 3, 'moat': 'Wide'},
@@ -40,6 +60,7 @@ MORNINGSTAR = {
     'AVGO':  {'fv': 258,  'stars': 3, 'moat': 'Wide'},
     'LITE':  {'fv': 90,   'stars': 3, 'moat': 'Narrow'},
     'COHR':  {'fv': 85,   'stars': 3, 'moat': 'Narrow'},
+    'JPM':   {'fv': 220,  'stars': 3, 'moat': 'Wide'},
 }
 
 OUTPUT_DIR = os.environ.get('OUTPUT_DIR', os.path.expanduser('~/Desktop'))
@@ -281,7 +302,9 @@ def fetch_stock(ticker):
         for k in WEEK_KEYS:
             d.update({f'{k}_expiry':None, f'{k}_put_wall':None, f'{k}_call_wall':None,
                       f'{k}_max_pain':None, f'{k}_gex':None,
-                      f'{k}_is_monthly':False, f'{k}_label':''})
+                      f'{k}_is_monthly':False, f'{k}_label':'',
+                      f'{k}_sell_hi':None, f'{k}_sell_lo':None,
+                      f'{k}_buy_hi':None,  f'{k}_buy_lo':None})
         d.update({'iv':None,'ivr':None,'pc_ratio':None})
         for wk in WEEK_KEYS:
             d.update({f'{wk}_target_call_strike':None, f'{wk}_target_call_expiry':None,
@@ -323,6 +346,29 @@ def fetch_stock(ticker):
                     d[f'{k}_max_pain']  = res.get('max_pain')
                     d[f'{k}_gex']       = calc_gex(cdf, pdf, price)
                     last_calls = cdf; last_puts = pdf
+
+                    # ── Buy/Sell Zone 計算 ─────────────────────
+                    try:
+                        mp = res.get('max_pain') or price
+                        # ATM Straddle: 最近 3 個 ATM Call + Put 的 mid-price 均值
+                        atm_idx = (cdf['strike'] - price).abs().argsort()[:3]
+                        atm_c   = cdf.iloc[atm_idx]
+                        atm_p   = pdf.iloc[(pdf['strike'] - price).abs().argsort()[:3]]
+                        c_mid   = pd.to_numeric(atm_c['lastPrice'], errors='coerce').mean()
+                        p_mid   = pd.to_numeric(atm_p['lastPrice'], errors='coerce').mean()
+                        straddle = (c_mid + p_mid) if (c_mid > 0 and p_mid > 0) else price * 0.05
+                        # Sell Zone: mp × 1.005 ~ mp × 1.005 + straddle×0.45
+                        sz_lo = round(mp * 1.005, 2)
+                        sz_hi = round(mp * 1.005 + straddle * 0.45, 2)
+                        # Buy Zone: mp × 0.955 ~ mp × 0.995
+                        bz_lo = round(mp * 0.955, 2)
+                        bz_hi = round(mp * 0.995, 2)
+                        d[f'{k}_sell_lo'] = sz_lo
+                        d[f'{k}_sell_hi'] = sz_hi
+                        d[f'{k}_buy_hi']  = bz_hi
+                        d[f'{k}_buy_lo']  = bz_lo
+                    except Exception as ez:
+                        print(f'    Zone計算錯誤[{i}]: {ez}')
                     mo = '★月結' if wk['is_monthly'] else ''
                     print(f'    {wk["label"]}{mo} ({d[f"{k}_expiry"]})  '
                           f'Put牆:{d[f"{k}_put_wall"]}  Pain:{d[f"{k}_max_pain"]}  Call牆:{d[f"{k}_call_wall"]}')
@@ -396,7 +442,9 @@ def fetch_spy_qqq():
             for k in WEEK_KEYS:
                 entry.update({f'{k}_expiry':None, f'{k}_put_wall':None,
                                f'{k}_call_wall':None, f'{k}_max_pain':None,
-                               f'{k}_is_monthly':False, f'{k}_label':''})
+                               f'{k}_is_monthly':False, f'{k}_label':'',
+                               f'{k}_sell_hi':None, f'{k}_sell_lo':None,
+                               f'{k}_buy_hi':None,  f'{k}_buy_lo':None})
             avail = t.options
 
             def _fetch_etf(tgt):
@@ -419,13 +467,26 @@ def fetch_spy_qqq():
                 k=WEEK_KEYS[i]
                 entry[f'{k}_label']=wk['label']; entry[f'{k}_is_monthly']=wk['is_monthly']
                 try:
-                    res,_,_=_fetch_etf(wk['date'])
+                    res,cdf,pdf=_fetch_etf(wk['date'])
                     entry[f'{k}_expiry']=res.get('expiry')
                     entry[f'{k}_put_wall']=res.get('put_wall')
                     entry[f'{k}_call_wall']=res.get('call_wall')
                     entry[f'{k}_max_pain']=res.get('max_pain')
                     mo='★月結' if wk['is_monthly'] else ''
                     print(f'    {sym} {wk["label"]}{mo} ({entry[f"{k}_expiry"]}) Put:{entry[f"{k}_put_wall"]} Pain:{entry[f"{k}_max_pain"]} Call:{entry[f"{k}_call_wall"]}')
+                    # Buy/Sell Zone
+                    try:
+                        mp = res.get('max_pain') or price
+                        atm_c = cdf.iloc[(cdf['strike']-price).abs().argsort()[:3]]
+                        atm_p = pdf.iloc[(pdf['strike']-price).abs().argsort()[:3]]
+                        c_mid = pd.to_numeric(atm_c['lastPrice'],errors='coerce').mean()
+                        p_mid = pd.to_numeric(atm_p['lastPrice'],errors='coerce').mean()
+                        st = (c_mid+p_mid) if (c_mid>0 and p_mid>0) else price*0.03
+                        entry[f'{k}_sell_lo'] = round(mp*1.005, 2)
+                        entry[f'{k}_sell_hi'] = round(mp*1.005+st*0.45, 2)
+                        entry[f'{k}_buy_hi']  = round(mp*0.995, 2)
+                        entry[f'{k}_buy_lo']  = round(mp*0.955, 2)
+                    except: pass
                 except Exception as e: print(f'    {sym} {wk["label"]}錯誤:{e}')
             result[sym]=entry
         except: pass
@@ -564,7 +625,7 @@ def pe_html(pe_ttm, pe_fwd):
         fwd = '<div class="fpe-fl">—</div>'
     elif pe_ttm is not None and pe_fwd < pe_ttm:
         col = '#e3b341' if pe_fwd > 100 else '#3fb950'
-        fwd = f'<div class="fpe-dn" style="color:{col}">{pe_fwd}x</div><div class="pe-note pos">↓ 獲利成長</div>'
+        fwd = f'<div class="fpe-dn" style="color:{col}">{pe_fwd}x</div><div class="pe-note pos">↑ 獲利成長</div>'
     else:
         fwd = f'<div class="fpe-fl">{pe_fwd}x</div><div class="pe-note gf">≈ 平穩</div>'
     return ttm, fwd
@@ -650,6 +711,57 @@ def gex_html_single(d, pfx):
             f'<div style="background:{col};height:4px;border-radius:2px;width:{bp}%"></div></div>')
 
 
+def zone_html(d, pfx):
+    """渲染單一週期的 Buy Zone / Sell Zone"""
+    sh = d.get(f'{pfx}_sell_hi')
+    sl = d.get(f'{pfx}_sell_lo')
+    bh = d.get(f'{pfx}_buy_hi')
+    bl = d.get(f'{pfx}_buy_lo')
+    if sh is None and bh is None:
+        return ''
+    fmt = lambda v: f'${v:g}' if v is not None else '—'
+    return (f'<div class="zone-wrap">'
+            f'<div class="zone-sell">🟢 Sell {fmt(sl)}~{fmt(sh)}</div>'
+            f'<div class="zone-buy">🔴 Buy {fmt(bl)}~{fmt(bh)}</div>'
+            f'</div>')
+
+
+def stock_tip_html(ticker):
+    """渲染個股建議觀察提示"""
+    tip = STOCK_TIPS.get(ticker)
+    if not tip:
+        return ''
+    _, icon_label, desc = tip
+    return (f'<div class="stk-tip">'
+            f'<span class="stk-tip-icon">{icon_label}</span>'
+            f'<span class="stk-tip-desc">{desc}</span>'
+            f'</div>')
+
+
+def zone_alert_html(d):
+    """比較現價與本週(w0) Buy/Sell Zone，觸及時顯示提醒"""
+    price  = d.get('price')
+    buy_lo = d.get('w0_buy_lo')
+    buy_hi = d.get('w0_buy_hi')
+    sell_lo = d.get('w0_sell_lo')
+    sell_hi = d.get('w0_sell_hi')
+    if price is None: return ''
+
+    alerts = []
+    # 股價 <= buy_hi（進入或低於 Buy Zone）
+    if buy_hi is not None and price <= buy_hi:
+        alerts.append(
+            '<div class="zone-alert-buy">🔴 分批買入提醒</div>'
+        )
+    # 股價 >= sell_lo（進入或高於 Sell Zone）
+    if sell_lo is not None and price >= sell_lo:
+        alerts.append(
+            '<div class="zone-alert-sell">🟢 分批賣出提醒</div>'
+        )
+    if not alerts: return ''
+    return '<div class="zone-alert-wrap">' + ''.join(alerts) + '</div>'
+
+
 def stock_row(d):
     if not d.get('ok'):
         mag = "<span class='m7'>Mag 7</span>" if d['ticker'] in MAG7 else ''
@@ -665,7 +777,8 @@ def stock_row(d):
     elif chg < 0: cc, cs, ps2 = 'neg', f'{chg:.2f}',  f'{chg_pct:.2f}%'
     else:         cc, cs, ps2 = 'neu', '—', '—'
 
-    oi_w = [oi_html_single(d, f'w{i}') + target_zone_html(d, f'w{i}_') for i in range(4)]
+    oi_w = [oi_html_single(d, f'w{i}') + target_zone_html(d, f'w{i}_') +
+            zone_html(d, f'w{i}') for i in range(4)]
     gx_w = [gex_html_single(d, f'w{i}') for i in range(4)]
 
     ttm_h, fwd_h     = pe_html(d['pe_ttm'], d['pe_fwd'])
@@ -675,6 +788,8 @@ def stock_row(d):
     mc    = fmt_cap(d.get('market_cap'))
     vol_h = vol_cell_html(d)
     ema_h = ema_cell_html(d)
+    tip_h   = stock_tip_html(ticker)
+    alert_h = zone_alert_html(d)
     mb    = f'<span class="m7">Mag 7</span>' if ticker in MAG7 else ''
 
     return f'''<tr>
@@ -683,6 +798,8 @@ def stock_row(d):
     <div class="pr">${price:.2f}</div>
     <div class="chg-row {cc}">{cs} <span class="pct">{ps2}</span></div>
     <div class="vol-inline">{vol_h}</div>
+    {tip_h}
+    {alert_h}
   </td>
   <td class="oi">{oi_w[0]}<div class="gex-inline">{gx_w[0]}</div></td>
   <td class="oi">{oi_w[1]}<div class="gex-inline">{gx_w[1]}</div></td>
@@ -741,15 +858,24 @@ def generate_report(stocks, vix, spy_qqq, date_str):
             exp   = ed.get(f'{k}_expiry','') or ''
             is_mo = ed.get(f'{k}_is_monthly',False)
             cw, mp, pw = ed.get(f'{k}_call_wall'), ed.get(f'{k}_max_pain'), ed.get(f'{k}_put_wall')
+            sh, sl = ed.get(f'{k}_sell_hi'), ed.get(f'{k}_sell_lo')
+            bh, bl = ed.get(f'{k}_buy_hi'),  ed.get(f'{k}_buy_lo')
             exps  = exp[5:] if exp else ''
             mob   = ('<span style="font-size:0.6em;color:#e3b341;background:rgba(227,179,65,.12);'
                      'border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px;margin-left:2px">月結</span>' if is_mo else '')
             fmt   = lambda v: f'${v:g}' if v is not None else '—'
+            zone_block = ''
+            if sh is not None:
+                zone_block = (f'<div style="margin-top:4px;padding-top:4px;border-top:1px dashed #30363d">'
+                              f'<div style="font-family:monospace;font-size:0.78em;color:#56d364;font-weight:600">🟢 Sell {fmt(sl)}~{fmt(sh)}</div>'
+                              f'<div style="font-family:monospace;font-size:0.78em;color:#f78166;font-weight:600;margin-top:2px">🔴 Buy {fmt(bl)}~{fmt(bh)}</div>'
+                              f'</div>')
             cells.append(f'<div style="background:#21262d;border-radius:6px;padding:7px 10px">'
                          f'<div class="oi-lbl">{lbl} {exps}{mob}</div>'
                          f'<div class="oi-call" style="font-size:0.85em">▼ {fmt(cw)}</div>'
                          f'<div class="oi-pain" style="font-size:0.85em">⚡ {fmt(mp)}</div>'
-                         f'<div class="oi-put"  style="font-size:0.85em">▲ {fmt(pw)}</div></div>')
+                         f'<div class="oi-put"  style="font-size:0.85em">▲ {fmt(pw)}</div>'
+                         f'{zone_block}</div>')
         return '\n'.join(cells)
 
     now_tw = datetime.now().strftime('%Y-%m-%d %H:%M')
@@ -824,7 +950,7 @@ td{{padding:11px 13px;vertical-align:top}}
 .sig-warn{{color:#e3b341;font-weight:700;font-size:0.74em;display:block;line-height:1.4}}
 .sig-note{{color:#484f58;font-size:0.68em;display:block;margin-top:1px;line-height:1.3}}
 /* 其他原有樣式 */
-.oi{{min-width:110px;max-width:140px;vertical-align:top}}
+.oi{{min-width:155px;max-width:185px;vertical-align:top}}
 .pr-td{{min-width:120px;max-width:160px;vertical-align:top}}
 .chg-row{{font-size:0.85em;margin-top:3px;white-space:nowrap}}
 .vol-inline{{margin-top:6px;padding-top:5px;border-top:1px dashed #30363d}}
@@ -891,6 +1017,18 @@ td{{padding:11px 13px;vertical-align:top}}
 .etf-neu{{background:rgba(72,79,88,.1);border:1px solid #30363d;color:#8b949e}}
 /* OI 四週 grid */
 .oi4grid{{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}}
+/* ═══ Buy/Sell Zone ═══ */
+.zone-wrap{{margin-top:5px;padding-top:4px;border-top:1px dashed #30363d}}
+.zone-sell{{font-family:monospace;font-size:0.78em;color:#56d364;white-space:nowrap;font-weight:600}}
+.zone-buy{{font-family:monospace;font-size:0.78em;color:#f78166;white-space:nowrap;font-weight:600;margin-top:2px}}
+/* ═══ 個股觀察建議 ═══ */
+.stk-tip{{margin-top:6px;padding:4px 7px;background:rgba(121,192,255,.06);border:1px solid rgba(121,192,255,.15);border-radius:5px;line-height:1.45}}
+.stk-tip-icon{{font-size:0.7em;color:#79c0ff;font-weight:700;display:block}}
+.stk-tip-desc{{font-size:0.62em;color:#8b949e;display:block;margin-top:1px;line-height:1.3}}
+/* ═══ Buy/Sell Zone 觸及提醒 ═══ */
+.zone-alert-wrap{{margin-top:5px}}
+.zone-alert-buy{{font-size:0.72em;font-weight:700;color:#f78166;background:rgba(247,129,102,.1);border:1px solid rgba(247,129,102,.3);border-radius:4px;padding:3px 7px;margin-bottom:3px;line-height:1.4}}
+.zone-alert-sell{{font-size:0.72em;font-weight:700;color:#56d364;background:rgba(86,211,100,.1);border:1px solid rgba(86,211,100,.3);border-radius:4px;padding:3px 7px;line-height:1.4}}
 .ftr{{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:12px 18px;text-align:center;color:#484f58;font-size:0.7em;line-height:2;margin-top:14px}}
 </style>
 </head>
@@ -899,8 +1037,8 @@ td{{padding:11px 13px;vertical-align:top}}
 
 <div class="hdr">
   <div>
-    <h1>📊 美股每日開盤掃描報告 Powered by 黑叔</h1>
-    <div class="sub">Magnificent 7 + TSM · MU · SNDK · NFLX · AMD · AVGO · LITE · COHR　｜　真實數據 yfinance　｜　晨星估值 · OI · IV · P/C Ratio · EMA15/50/100 趨勢訊號</div>
+    <h1>📊 美股每日開盤掃描報告 Powered by 黑叔 — v6.11h1>
+    <div class="sub">Magnificent 7 + TSM · MU · SNDK · NFLX · AMD · AVGO · LITE · COHR · JPM　｜　真實數據 yfinance　｜　晨星估值 · OI · IV · P/C Ratio · EMA15/50/100 · Buy/Sell Zone</div>
   </div>
   <div class="hdr-r">
     <div class="dt">{display_date}</div>
@@ -941,6 +1079,8 @@ td{{padding:11px 13px;vertical-align:top}}
   <span style="color:#e3b341">月結</span>=當月第三週五
   <span>｜</span>
   <span style="color:#a371f7">🎯↑</span> OTM Call　<span style="color:#79c0ff">🎯↓</span> OTM Put
+  <span>｜</span>
+  <span style="color:#56d364;font-weight:600">🟢 Sell Zone</span>=盤中獲利出場區　<span style="color:#f78166;font-weight:600">🔴 Buy Zone</span>=分批承接區（觸及 Sell Hi 立刻出）
   <span>｜ EMA訊號：</span>
   <span class="sig-bull" style="display:inline">🌟黃金交叉</span>
   <span class="sig-bear" style="display:inline">💀死亡交叉</span>
@@ -1011,7 +1151,7 @@ td{{padding:11px 13px;vertical-align:top}}
 <div class="ftr">
   ⚠️ 本報告數據來自 Yahoo Finance（yfinance），OI / Max Pain 為真實期權鏈計算，晨星估值為靜態手動更新。僅供參考，不構成投資建議。<br>
   數據來源：Yahoo Finance · yfinance　｜　報告產生：{now_tw} 台灣時間<br>
-  <span style="color:#21262d">本機版 v5.2 · python3 stock_scan.py · 四週 OI + GEX + EMA15/50/100 趨勢訊號</span>
+  <span style="color:#21262d">本機版 v6.11� python3 stock_scan.py · 四週 OI + GEX + EMA15/50/100 + Buy/Sell Zone + 個股建議</span>
 </div>
 
 </div>
@@ -1025,7 +1165,7 @@ td{{padding:11px 13px;vertical-align:top}}
 
 def main():
     print('=' * 50)
-    print('美股每日掃描報告 Powered by 黑叔 — v5.2')
+    print('美股每日掃描報告 Powered by 黑叔 - v6.11')
     print('=' * 50)
 
     date_str    = datetime.now().strftime('%Y%m%d')
