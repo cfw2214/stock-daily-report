@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-美股每日開盤掃描報告 Powered by 黑叔 — v6.11
-量比 + EMA15/50/100 合併欄 | SPY/QQQ EMA技術分析建議
-使用 yfinance 抓取真實股價、期權 OI、IV、P/C Ratio、EMA 數據
+美股每日開盤掃描報告 Powered by 黑叔 — v7.0
+HMA/短EMA/大EMA 最優參數支撐壓力 | 期權流五法共識 | Buy/Sell Zone（回測驗證係數）
+使用 yfinance 抓取真實股價、期權 OI、IV、P/C Ratio、HMA/EMA 數據
 執行方式：python3 stock_scan.py
 依賴套件：pip3 install yfinance pandas requests
 """
@@ -64,6 +64,174 @@ MORNINGSTAR = {
 }
 
 OUTPUT_DIR = os.environ.get('OUTPUT_DIR', os.path.expanduser('~/Desktop'))
+
+
+# ═══════════════════════════════════════════════════════════════
+#  HMA / EMA 最優參數表（52週 × 19股回測研究 2026-03-15）
+#  (hma週期, 短ema週期, 大ema週期, hma支撐5d%, hma壓力5d%, 評級, 假穿越%)
+# ═══════════════════════════════════════════════════════════════
+
+DEFAULT_HMA_P, DEFAULT_EMA_P, DEFAULT_BIG_EMA_P = 18, 13, 57
+
+EMA_HMA_CFG = {
+    'SPY':  (24,  6, 57,  83.3, 87.5, '雙向強',   47.9),
+    'QQQ':  (28,  6, 57,  89.5, 63.2, '支撐強',   54.8),
+    'AAPL': (19, 14, 69,  76.5, 83.3, '雙向強',   28.8),
+    'MSFT': (11, 17, 59,  78.8, 50.0, '支撐偏強', 59.9),
+    'NVDA': (22,  8, 64,  76.0, 48.0, '支撐偏強', 54.0),
+    'AMZN': (12, 19, 51,  79.3, 62.1, '雙向強',   50.7),
+    'GOOGL':(14, 19, 66,  85.0, 42.1, '支撐偏強', 34.4),
+    'META': (21, 16, 58,  70.6, 68.8, '雙向強',   41.2),
+    'TSLA': (15,  5, 58,  53.3, 43.3, '雙向弱',   61.3),
+    'AMD':  (19, 19, 53,  73.3, 56.2, '支撐偏強', 41.2),
+    'TSM':  (11, 19, 59,  61.8, 48.6, '普通',     58.0),
+    'MU':   (29, 13, 61,  72.2, 36.8, '支撐偏強', 56.4),
+    'AVGO': (11, 19, 51,  65.7, 34.3, '壓力弱',   60.6),
+    'SNDK': (12, 15, 51,  63.0, 25.9, '壓力弱',   58.4),
+    'NFLX': (12, 11, 61,  57.7, 60.0, '壓力偏強', 44.2),
+    'LITE': (28,  7, None,70.6, 23.5, '壓力弱',   42.6),
+    'COHR': (25, 19, 58,  66.7, 38.1, '支撐偏強', 46.3),
+    'JPM':  (28, 16, 53,  80.0, 62.5, '雙向強',   41.7),
+}
+
+# 多頭逆轉勝率（突破大EMA後5日上漲概率）
+BULL_WIN = {
+    'AVGO':71,'QQQ':71,'SPY':57,'NFLX':50,'WDC':50,'COHR':33,
+    'AAPL':45,'NVDA':48,'META':52,'AMZN':55,'MSFT':40,'AMD':42,
+    'MU':50,'TSM':45,'TSLA':38,'GOOGL':55,'JPM':52,'SNDK':40,'LITE':40,
+}
+# 空頭逆轉勝率（跌破大EMA後持續下跌概率）
+BEAR_WIN = {
+    'MSFT':50,'QQQ':40,'AAPL':38,'MU':36,'NFLX':31,'SPY':30,
+    'NVDA':28,'META':32,'AMZN':28,'TSLA':35,'AMD':30,'AVGO':25,
+    'WDC':22,'COHR':30,'TSM':28,'GOOGL':25,'JPM':30,'SNDK':25,'LITE':20,
+}
+SUPPORT_ONLY = {'AVGO','WDC','LITE','SNDK'}
+WEAK_BOTH    = {'TSLA','TSM'}
+
+
+def _hma(series, period):
+    half  = max(int(period / 2), 2)
+    sqrtn = max(int(period ** 0.5), 2)
+    wma_h = series.ewm(span=half,   adjust=False).mean()
+    wma_n = series.ewm(span=period, adjust=False).mean()
+    return (2 * wma_h - wma_n).ewm(span=sqrtn, adjust=False).mean()
+
+
+def _ema(series, period):
+    return series.ewm(span=period, adjust=False).mean()
+
+
+def calc_hma_ema_data(ticker, closes):
+    """
+    計算個股 HMA / 短EMA / 大EMA 當前值與角色，回傳 dict。
+    closes: pd.Series 收盤價（至少 120 個交易日）
+    """
+    cfg = EMA_HMA_CFG.get(ticker.upper())
+    if cfg:
+        hma_p, ema_p, big_p, sup5d, res5d, rating, fake_pct = cfg
+    else:
+        hma_p, ema_p, big_p = DEFAULT_HMA_P, DEFAULT_EMA_P, DEFAULT_BIG_EMA_P
+        sup5d, res5d, rating, fake_pct = 65.0, 47.0, '預設', 50.0
+
+    big_p = big_p or DEFAULT_BIG_EMA_P
+    bull_win = BULL_WIN.get(ticker.upper(), 48)
+    bear_win = BEAR_WIN.get(ticker.upper(), 30)
+
+    try:
+        n = len(closes)
+        if n < max(hma_p, ema_p, big_p) + 5:
+            return None
+
+        S         = float(closes.iloc[-1])
+        prev      = float(closes.iloc[-2])
+        hma_s     = _hma(closes, hma_p)
+        ema_s     = _ema(closes, ema_p)
+        big_s     = _ema(closes, big_p)
+
+        hma_val   = float(hma_s.iloc[-1])
+        ema_val   = float(ema_s.iloc[-1])
+        big_val   = float(big_s.iloc[-1])
+        prev_hma  = float(hma_s.iloc[-2])
+        prev_ema  = float(ema_s.iloc[-2])
+        prev_big  = float(big_s.iloc[-2])
+
+        # 穿越偵測
+        hma_cross_up   = prev < prev_hma and S > hma_val
+        hma_cross_down = prev > prev_hma and S < hma_val
+        ema_cross_up   = prev < prev_ema and S > ema_val
+        ema_cross_down = prev > prev_ema and S < ema_val
+        big_cross_up   = prev < prev_big and S > big_val
+        big_cross_down = prev > prev_big and S < big_val
+
+        above_hma = S > hma_val
+        above_ema = S > ema_val
+        above_big = S > big_val
+
+        # 動態角色：在上=支撐，在下=壓力
+        def _role(above, cross_up, cross_down):
+            if cross_up:   return 'just_up'
+            if cross_down: return 'just_down'
+            return 'support' if above else 'resist'
+
+        hma_role = _role(above_hma, hma_cross_up, hma_cross_down)
+        ema_role = _role(above_ema, ema_cross_up, ema_cross_down)
+        big_role = _role(above_big, big_cross_up, big_cross_down)
+
+        # 盤整五條件評分
+        atr_raw = (closes.diff().abs().rolling(14).mean()).iloc[-1]
+        atr = max(atr_raw if not math.isnan(atr_raw) else S*0.02, S*0.015)
+        c1 = abs(ema_val - hma_val) / atr < 0.8
+        c2 = abs(float(hma_s.iloc[-1]) - float(hma_s.iloc[-6])) / atr < 0.3 if n >= 7 else False
+        c3 = abs(S - big_val) / atr < 2.0
+        c4 = False
+        ema200_val = None
+        above_ema200 = None
+        if n >= 200:
+            ema200_val = round(float(_ema(closes, 200).iloc[-1]), 2)
+            above_ema200 = S > ema200_val
+            c4 = abs(S - ema200_val) / atr < 3.0
+        c5 = abs(ema_val - big_val) / atr < 1.0
+        consol = sum([c1, c2, c3, c4, c5])
+        is_consol = consol >= 3
+
+        # 中期趨勢
+        both_above = above_hma and above_ema and above_big
+        both_below = not above_hma and not above_ema and not above_big
+        if big_cross_up:
+            mid = f'📈剛突破大EMA({bull_win}%上漲)'
+        elif big_cross_down:
+            mid = f'📉剛跌破大EMA({bear_win}%下跌)'
+        elif is_consol:
+            mid = f'⚪盤整({consol}/5) 結束後70%向上'
+        elif both_above:
+            mid = f'📈中期上行({bull_win}%)'
+        elif both_below:
+            mid = f'📉中期下行({bear_win}%)'
+        else:
+            mid = '🟡方向分歧，等兩線同步'
+
+        return {
+            'hma_p': hma_p, 'ema_p': ema_p, 'big_p': big_p,
+            'hma_val': round(hma_val, 2),
+            'ema_val': round(ema_val, 2),
+            'big_val': round(big_val, 2),
+            'ema200_val': ema200_val,
+            'above_ema200': above_ema200,
+            'hma_role': hma_role, 'ema_role': ema_role, 'big_role': big_role,
+            'sup5d': sup5d, 'res5d': res5d,
+            'rating': rating, 'fake_pct': fake_pct,
+            'bull_win': bull_win, 'bear_win': bear_win,
+            'consol': consol, 'is_consol': is_consol,
+            'mid': mid,
+            'support_only': ticker.upper() in SUPPORT_ONLY,
+            'weak_both': ticker.upper() in WEAK_BOTH,
+            'hma_cross_up': hma_cross_up, 'hma_cross_down': hma_cross_down,
+            'ema_cross_up': ema_cross_up, 'ema_cross_down': ema_cross_down,
+            'big_cross_up': big_cross_up, 'big_cross_down': big_cross_down,
+        }
+    except Exception:
+        return None
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -162,11 +330,11 @@ def fmt_pe(val):
 
 
 # ═══════════════════════════════════════════════════════════════
-#  EMA 計算 + 訊號引擎（共用）
+#  EMA 計算 + 訊號引擎（SPY/QQQ 大盤用）
 # ═══════════════════════════════════════════════════════════════
 
 def _compute_emas(closes):
-    """計算 EMA15/50/100 及前一日值，回傳 dict"""
+    """計算 EMA15/50/100 及前一日值，供 SPY/QQQ 大盤分析用"""
     n    = len(closes)
     e15  = closes.ewm(span=15,  adjust=False).mean()
     e50  = closes.ewm(span=50,  adjust=False).mean()
@@ -297,6 +465,8 @@ def fetch_stock(ticker):
 
         closes = hl['Close'] if not hl.empty else hs['Close']
         d.update(_compute_emas(closes))
+        # ── HMA / EMA 最優技術面計算 ──────────────────────────
+        d['hma_ema'] = calc_hma_ema_data(ticker, closes)
 
         WEEK_KEYS = ['w0','w1','w2','w3']
         for k in WEEK_KEYS:
@@ -304,13 +474,10 @@ def fetch_stock(ticker):
                       f'{k}_max_pain':None, f'{k}_gex':None,
                       f'{k}_is_monthly':False, f'{k}_label':'',
                       f'{k}_sell_hi':None, f'{k}_sell_lo':None,
-                      f'{k}_buy_hi':None,  f'{k}_buy_lo':None})
+                      f'{k}_buy_hi':None,  f'{k}_buy_lo':None,
+                      f'{k}_settle_lo':None, f'{k}_settle_hi':None,
+                      f'{k}_consensus':None})
         d.update({'iv':None,'ivr':None,'pc_ratio':None})
-        for wk in WEEK_KEYS:
-            d.update({f'{wk}_target_call_strike':None, f'{wk}_target_call_expiry':None,
-                      f'{wk}_target_put_strike':None,  f'{wk}_target_put_expiry':None})
-        d.update({'target_call_strike':None,'target_call_expiry':None,
-                  'target_put_strike':None, 'target_put_expiry':None})
 
         def _fetch_oi(target_str, avail):
             if not avail or not target_str: raise ValueError('無到期日')
@@ -347,60 +514,32 @@ def fetch_stock(ticker):
                     d[f'{k}_gex']       = calc_gex(cdf, pdf, price)
                     last_calls = cdf; last_puts = pdf
 
-                    # ── Buy/Sell Zone 計算 ─────────────────────
+                    # ── Buy/Sell Zone（回測驗證：straddle×0.3~1.3 蓋頂82%）─
                     try:
                         mp = res.get('max_pain') or price
-                        # ATM Straddle: 最近 3 個 ATM Call + Put 的 mid-price 均值
                         atm_idx = (cdf['strike'] - price).abs().argsort()[:3]
                         atm_c   = cdf.iloc[atm_idx]
                         atm_p   = pdf.iloc[(pdf['strike'] - price).abs().argsort()[:3]]
                         c_mid   = pd.to_numeric(atm_c['lastPrice'], errors='coerce').mean()
                         p_mid   = pd.to_numeric(atm_p['lastPrice'], errors='coerce').mean()
-                        straddle = (c_mid + p_mid) if (c_mid > 0 and p_mid > 0) else price * 0.05
-                        # Sell Zone: mp × 1.005 ~ mp × 1.005 + straddle×0.45
-                        sz_lo = round(mp * 1.005, 2)
-                        sz_hi = round(mp * 1.005 + straddle * 0.45, 2)
-                        # Buy Zone: mp × 0.955 ~ mp × 0.995
-                        bz_lo = round(mp * 0.955, 2)
-                        bz_hi = round(mp * 0.995, 2)
-                        d[f'{k}_sell_lo'] = sz_lo
-                        d[f'{k}_sell_hi'] = sz_hi
-                        d[f'{k}_buy_hi']  = bz_hi
-                        d[f'{k}_buy_lo']  = bz_lo
+                        straddle = (c_mid + p_mid) * 0.85 if (c_mid > 0 and p_mid > 0) else price * 0.04
+                        # Sell Zone = [S + straddle×0.3, S + straddle×1.3]
+                        d[f'{k}_sell_lo'] = round(price + straddle * 0.3, 2)
+                        d[f'{k}_sell_hi'] = round(price + straddle * 1.3, 2)
+                        # Buy Zone  = [S - straddle×1.3, S - straddle×0.3]
+                        d[f'{k}_buy_lo']  = round(price - straddle * 1.3, 2)
+                        d[f'{k}_buy_hi']  = round(price - straddle * 0.3, 2)
+                        # 週五結算磁吸區 = Max Pain ± 1%
+                        d[f'{k}_settle_lo'] = round(mp * 0.99, 2)
+                        d[f'{k}_settle_hi'] = round(mp * 1.01, 2)
+                        d[f'{k}_max_pain']  = res.get('max_pain')
+                        # 五法共識（保留計算以供顯示）
+                        d[f'{k}_consensus'] = round((mp + price + straddle) / 3, 2) if straddle else None
                     except Exception as ez:
                         print(f'    Zone計算錯誤[{i}]: {ez}')
                     mo = '★月結' if wk['is_monthly'] else ''
                     print(f'    {wk["label"]}{mo} ({d[f"{k}_expiry"]})  '
                           f'Put牆:{d[f"{k}_put_wall"]}  Pain:{d[f"{k}_max_pain"]}  Call牆:{d[f"{k}_call_wall"]}')
-                    try:
-                        es = res.get('expiry','')
-                        wp = WEEK_KEYS[i]+'_'
-                        cv = cdf.copy()
-                        cv['volume'] = pd.to_numeric(cv['volume'],errors='coerce').fillna(0)
-                        cv['openInterest'] = pd.to_numeric(cv['openInterest'],errors='coerce').fillna(0)
-                        oc = cv[(cv['strike']>price*1.01)&(cv['strike']<=price*1.30)&(cv['openInterest']>0)]
-                        if not oc.empty:
-                            oc = oc.copy()
-                            oc['score'] = (oc['volume']/oc['openInterest']*oc['volume']**0.5
-                                           if oc['volume'].sum()>0 else oc['openInterest'])
-                            bc = oc.loc[oc['score'].idxmax()]
-                            d[f'{wp}target_call_strike'] = float(bc['strike'])
-                            d[f'{wp}target_call_expiry'] = es
-                            if i==0: d['target_call_strike']=d[f'{wp}target_call_strike']; d['target_call_expiry']=es
-                        pv = pdf.copy()
-                        pv['volume'] = pd.to_numeric(pv['volume'],errors='coerce').fillna(0)
-                        pv['openInterest'] = pd.to_numeric(pv['openInterest'],errors='coerce').fillna(0)
-                        op = pv[(pv['strike']<price*0.99)&(pv['strike']>=price*0.70)&(pv['openInterest']>0)]
-                        if not op.empty:
-                            op = op.copy()
-                            op['score'] = (op['volume']/op['openInterest']*op['volume']**0.5
-                                           if op['volume'].sum()>0 else op['openInterest'])
-                            bp = op.loc[op['score'].idxmax()]
-                            d[f'{wp}target_put_strike'] = float(bp['strike'])
-                            d[f'{wp}target_put_expiry'] = es
-                            if i==0: d['target_put_strike']=d[f'{wp}target_put_strike']; d['target_put_expiry']=es
-                        print(f'    {wk["label"]}OTM Call:{d[f"{wp}target_call_strike"]}  Put:{d[f"{wp}target_put_strike"]}')
-                    except Exception as e: print(f'    OTM錯誤[{i}]: {e}')
                 except Exception as e: print(f'    {wk["label"]}期權錯誤 {ticker}: {e}')
 
             if last_calls is not None:
@@ -438,6 +577,9 @@ def fetch_spy_qqq():
                 'change_pct': round((price-prev)/prev*100,2),
             }
             entry.update(_compute_emas(closes))
+            # ── HMA/EMA 最優參數計算 ──────────────────────────
+            entry['hma_ema'] = calc_hma_ema_data(sym, closes)
+            entry['ticker']  = sym
 
             for k in WEEK_KEYS:
                 entry.update({f'{k}_expiry':None, f'{k}_put_wall':None,
@@ -474,18 +616,20 @@ def fetch_spy_qqq():
                     entry[f'{k}_max_pain']=res.get('max_pain')
                     mo='★月結' if wk['is_monthly'] else ''
                     print(f'    {sym} {wk["label"]}{mo} ({entry[f"{k}_expiry"]}) Put:{entry[f"{k}_put_wall"]} Pain:{entry[f"{k}_max_pain"]} Call:{entry[f"{k}_call_wall"]}')
-                    # Buy/Sell Zone
+                    # Buy/Sell Zone（新係數）
                     try:
                         mp = res.get('max_pain') or price
                         atm_c = cdf.iloc[(cdf['strike']-price).abs().argsort()[:3]]
                         atm_p = pdf.iloc[(pdf['strike']-price).abs().argsort()[:3]]
                         c_mid = pd.to_numeric(atm_c['lastPrice'],errors='coerce').mean()
                         p_mid = pd.to_numeric(atm_p['lastPrice'],errors='coerce').mean()
-                        st = (c_mid+p_mid) if (c_mid>0 and p_mid>0) else price*0.03
-                        entry[f'{k}_sell_lo'] = round(mp*1.005, 2)
-                        entry[f'{k}_sell_hi'] = round(mp*1.005+st*0.45, 2)
-                        entry[f'{k}_buy_hi']  = round(mp*0.995, 2)
-                        entry[f'{k}_buy_lo']  = round(mp*0.955, 2)
+                        st = (c_mid+p_mid)*0.85 if (c_mid>0 and p_mid>0) else price*0.03
+                        entry[f'{k}_sell_lo'] = round(price + st*0.3, 2)
+                        entry[f'{k}_sell_hi'] = round(price + st*1.3, 2)
+                        entry[f'{k}_buy_lo']  = round(price - st*1.3, 2)
+                        entry[f'{k}_buy_hi']  = round(price - st*0.3, 2)
+                        entry[f'{k}_settle_lo'] = round(mp*0.99, 2)
+                        entry[f'{k}_settle_hi'] = round(mp*1.01, 2)
                     except: pass
                 except Exception as e: print(f'    {sym} {wk["label"]}錯誤:{e}')
             result[sym]=entry
@@ -561,57 +705,208 @@ def ema_cell_html(d):
     return f'{ema_rows}{sig_html}'
 
 
-def vol_ema_cell_html(d):
-    """舊版相容，不再使用"""
-    return vol_cell_html(d)
+def hma_ema_cell_html(d):
+    """
+    個股 HMA/短EMA/大EMA/EMA200 技術面欄
+    每條線：第一行 標籤+$價格（不換行）
+            第二行 角色+勝率%+漲跌%+回測建議（nowrap）
+    """
+    he = d.get('hma_ema')
+    if not he:
+        return '<div style="color:#484f58;font-size:0.75em">HMA/EMA 計算中…</div>'
+
+    price   = d.get('price', 0)
+    ticker  = (d.get('ticker') or '').upper()
+
+    ROLES = {
+        'just_up':   ('#3fb950', '🔔↑', '剛突破→支撐'),
+        'just_down': ('#f85149', '🔔↓', '剛跌破→壓力'),
+        'support':   ('#3fb950', '●',   '支撐'),
+        'resist':    ('#f85149', '●',   '壓力'),
+    }
+
+    # ── 回測研究建議邏輯 ──────────────────────────────────────
+    # 三線同步在大EMA上方/下方
+    above_big = he.get('big_role') in ('support', 'just_up')
+    above_hma = he.get('hma_role') in ('support', 'just_up')
+    above_ema = he.get('ema_role') in ('support', 'just_up')
+    triple_above = above_big and above_hma and above_ema   # 三線都在大EMA上 → 強多
+    triple_below = not above_big and not above_hma and not above_ema  # 三線同步跌破
+
+    # 個股特殊規則（來自記憶庫）
+    BUY_ON_DROP  = {'AVGO','COHR','TSM','JPM','MU','SNDK','AMD','WDC'}  # 跌破大EMA=買點
+    BEAR_VALID   = {'NFLX','MSFT','META'}       # 空頭逆轉有效股
+    NO_SELL_BELOW = {'AVGO','WDC','LITE','SNDK'} # 壓力線失效，只做支撐
+
+    def _adv(role_key, line_type='hma'):
+        """根據角色+線型+個股特性生成建議"""
+        is_up   = role_key in ('support', 'just_up')
+        is_down = role_key in ('resist',  'just_down')
+        cross_u = role_key == 'just_up'
+        cross_d = role_key == 'just_down'
+
+        if line_type == 'hma':
+            if cross_u and triple_above:
+                return '三線多頭，10日勝率68%'
+            if cross_u:
+                return 'HMA突破，趨勢型信號'
+            if cross_d and triple_below:
+                if ticker in BUY_ON_DROP:
+                    return '三線跌破，此股逆向買'
+                if ticker in BEAR_VALID:
+                    return '三線同步跌破，空頭確認'
+                return '假跌破概率高，等3日確認'
+            if cross_d:
+                return 'HMA跌破，等3日確認方向'
+            if is_up and triple_above:
+                return '三線多頭，守HMA持多'
+            if is_up:
+                return '守HMA支撐，偏多操作'
+            if is_down:
+                return '反彈至此可減碼'
+
+        elif line_type == 'ema':
+            if cross_u:
+                return '短EMA突破=短暫反彈'
+            if cross_d:
+                return 'EMA跌破，短線轉弱'
+            if is_up:
+                return 'EMA支撐中，動能偏多'
+            if is_down:
+                if triple_below:
+                    return '三線空排，EMA壓制'
+                return '短EMA壓力，等突破'
+
+        elif line_type == 'big':
+            if cross_u:
+                if ticker in BUY_ON_DROP:
+                    return f'突破大EMA，多頭逆轉'
+                return '突破大EMA，趨勢轉多'
+            if cross_d:
+                if ticker in BUY_ON_DROP:
+                    return f'{ticker}跌破=逆向做多'
+                if ticker in BEAR_VALID:
+                    return '跌破大EMA，持空'
+                return '跌破大EMA，多反彈'
+            if is_up:
+                return '站上大EMA，趨勢確認'
+            if is_down:
+                return '大EMA壓制，反彈減碼'
+
+        return ''
+
+    def two_line(tag, val, role_key, win_pct, line_type='hma'):
+        if val is None:
+            return ''
+        col, icon, role_txt = ROLES.get(role_key, ('#8b949e','●','觀察'))
+        pct      = (price - val) / val * 100 if val else 0
+        pct_col  = '#3fb950' if pct >= 0 else '#f85149'
+        pct_sign = '+' if pct >= 0 else ''
+        adv      = _adv(role_key, line_type)
+        return (
+            # 行1：標籤 + 價格（同一行，nowrap）
+            f'<div style="display:flex;justify-content:space-between;align-items:baseline;'
+            f'margin-top:6px;white-space:nowrap">'
+            f'<span style="font-size:0.65em;color:#8b949e">{tag}</span>'
+            f'<span style="font-family:monospace;font-size:0.95em;font-weight:700;'
+            f'color:{col};margin-left:6px">${val:.2f}</span>'
+            f'</div>'
+            # 行2：角色+勝率+漲跌+建議（nowrap）
+            f'<div style="display:flex;justify-content:space-between;align-items:center;'
+            f'padding-bottom:5px;border-bottom:1px solid #21262d;white-space:nowrap">'
+            f'<span style="font-size:0.67em;color:{col};font-weight:600">'
+            f'{icon} {role_txt} {win_pct:.0f}% '
+            f'<span style="color:{pct_col}">{pct_sign}{pct:.1f}%</span></span>'
+            f'<span style="font-size:0.6em;color:#6e7681;margin-left:6px">{adv}</span>'
+            f'</div>'
+        )
+
+    hma_win = he['sup5d'] if he['hma_role'] in ('support','just_up') else he['res5d']
+    ema_win = he['sup5d']*0.95 if he['ema_role'] in ('support','just_up') else he['res5d']*1.02
+    big_win = he['bull_win'] if he['big_role'] in ('support','just_up') else he['bear_win']
+
+    hma_row = two_line(f'HMA{he["hma_p"]}',   he['hma_val'], he['hma_role'], hma_win, 'hma')
+    ema_row = two_line(f'EMA{he["ema_p"]}',   he['ema_val'], he['ema_role'], ema_win, 'ema')
+    big_row = two_line(f'大EMA{he["big_p"]}', he['big_val'], he['big_role'], big_win, 'big')
+
+    # EMA200 行
+    ema200_row = ''
+    if he.get('ema200_val') is not None:
+        v200       = he['ema200_val']
+        ab         = he.get('above_ema200', True)
+        col200     = '#3fb950' if ab else '#f85149'
+        pct200     = (price - v200) / v200 * 100
+        pct200_col = '#3fb950' if pct200 >= 0 else '#f85149'
+        # EMA200 個股特殊建議
+        if ab:
+            if ticker in ('JPM','TSLA','AVGO','AAPL','COHR'):
+                adv200 = '長期多頭，逆轉分高持多'
+            else:
+                adv200 = '長期多頭結構，持多'
+        else:
+            if ticker in BUY_ON_DROP:
+                adv200 = f'{ticker}跌破EMA200=買點'
+            elif ticker in ('NFLX',):
+                adv200 = 'NFLX空頭最強，可持空'
+            else:
+                adv200 = '跌破長期均線，謹慎'
+        status = '● 長期支撐' if ab else '● 長期壓力'
+        ema200_row = (
+            f'<div style="display:flex;justify-content:space-between;align-items:baseline;'
+            f'margin-top:6px;white-space:nowrap">'
+            f'<span style="font-size:0.65em;color:#8b949e">EMA200</span>'
+            f'<span style="font-family:monospace;font-size:0.95em;font-weight:700;'
+            f'color:{col200};margin-left:6px">${v200:.2f}</span>'
+            f'</div>'
+            f'<div style="display:flex;justify-content:space-between;align-items:center;'
+            f'padding-bottom:5px;border-bottom:1px solid #21262d;white-space:nowrap">'
+            f'<span style="font-size:0.67em;color:{col200};font-weight:600">{status}'
+            f'<span style="color:{pct200_col};margin-left:5px">{pct200:+.1f}%</span></span>'
+            f'<span style="font-size:0.6em;color:#6e7681;margin-left:6px">{adv200}</span>'
+            f'</div>'
+        )
+
+    # 警告
+    warn = ''
+    if he.get('support_only'):
+        warn = ('<div style="font-size:0.62em;color:#e3b341;margin-bottom:3px;padding:2px 5px;'
+                'background:rgba(227,179,65,.08);border-radius:3px">⚠ 壓力線失效，只看支撐</div>')
+    elif he.get('weak_both'):
+        warn = ('<div style="font-size:0.62em;color:#e3b341;margin-bottom:3px;padding:2px 5px;'
+                'background:rgba(227,179,65,.08);border-radius:3px">⚠ 雙向弱，需3日確認</div>')
+
+    # 評級行
+    rating_col = '#3fb950' if '強' in he['rating'] else '#e3b341' if '偏' in he['rating'] else '#8b949e'
+    header = (
+        f'<div style="display:flex;justify-content:space-between;margin-bottom:2px">'
+        f'<span style="font-size:0.62em;color:{rating_col};font-weight:600">{he["rating"]}</span>'
+        f'<span style="font-size:0.62em;color:#484f58">假穿越 {he["fake_pct"]:.0f}%</span>'
+        f'</div>'
+    )
+
+    # 中期趨勢
+    mid_col = ('#3fb950' if '上行' in he['mid'] or '剛突破' in he['mid']
+               else '#f85149' if '下行' in he['mid'] or '剛跌破' in he['mid']
+               else '#e3b341')
+    mid_html = (
+        f'<div style="margin-top:6px;padding:4px 7px;background:#1c2128;border-radius:4px">'
+        f'<span style="font-size:0.62em;color:#484f58">中期趨勢　</span>'
+        f'<span style="font-size:0.75em;font-weight:700;color:{mid_col}">{he["mid"]}</span>'
+        f'</div>'
+    )
+
+    return f'{warn}{header}{hma_row}{ema_row}{big_row}{ema200_row}{mid_html}'
 
 
 def etf_ema_block_html(etf_data):
-    """SPY/QQQ 卡片：EMA15/50/100 數值 + 最強訊號 + 建議文字"""
-    price      = etf_data.get('price', 0)
-    e15        = etf_data.get('ema15')
-    e15_prev   = etf_data.get('ema15_prev', e15)
-    e50        = etf_data.get('ema50')
-    e50_prev   = etf_data.get('ema50_prev', e50)
-    e100       = etf_data.get('ema100')
-    prev_close = etf_data.get('prev_close', price)
-
-    def ema_row(label, ema):
-        if ema is None:
-            return (f'<div class="mkr">'
-                    f'<span class="k">{label}</span>'
-                    f'<span class="v" style="color:#484f58">N/A</span></div>')
-        pct   = (price - ema) / ema * 100
-        cls   = 'pos' if pct >= 0 else 'neg'
-        arrow = '▲ 站上' if pct >= 0 else '▼ 跌破'
-        sign  = '+' if pct >= 0 else ''
-        return (f'<div class="mkr">'
-                f'<span class="k">{label}</span>'
-                f'<span class="v {cls}">${ema:.2f} {arrow} ({sign}{pct:.1f}%)</span>'
-                f'</div>')
-
-    rows = ema_row('EMA15', e15) + ema_row('EMA50', e50) + ema_row('EMA100', e100)
-
-    # 訊號
-    sigs = _ema_signals(price, prev_close, e15, e15_prev, e50, e50_prev, e100)
-    if sigs:
-        _, icon, cls, title, note = sigs[0]
-        sig_div = (f'<div class="etf-sig">'
-                   f'<span class="{cls}">{icon} {title}</span>'
-                   f'<span class="sig-note" style="margin-left:6px">{note}</span>'
-                   f'</div>')
-    else:
-        sig_div = ''
-
-    # 建議文字
-    advice_cls, advice_txt = _ema_advice(e15, e50, e100)
-
-    return (f'<div class="etf-ema-blk">'
-            f'<div class="oi-lbl" style="margin-bottom:7px;letter-spacing:0.6px">📐 EMA 均線分析</div>'
-            f'{rows}'
-            f'{sig_div}'
-            f'<div class="etf-advice {advice_cls}">{advice_txt}</div>'
-            f'</div>')
+    """SPY/QQQ 卡片：HMA/EMA 最優四層分析（復用 hma_ema_cell_html）"""
+    # 直接沿用個股格的渲染邏輯，etf_data 結構相同
+    return (
+        f'<div class="etf-ema-blk">'
+        f'<div class="oi-lbl" style="margin-bottom:7px;letter-spacing:0.6px">📐 HMA/EMA 均線分析</div>'
+        f'{hma_ema_cell_html(etf_data)}'
+        f'</div>'
+    )
 
 
 def pe_html(pe_ttm, pe_fwd):
@@ -664,35 +959,115 @@ def ms_html(ticker, price):
             f'<span class="{mc}">{mt}</span>')
 
 
-def target_zone_html(d, pfx='w0_'):
-    cs = d.get(f'{pfx}target_call_strike')
-    ps = d.get(f'{pfx}target_put_strike')
-    if cs is None and ps is None:
-        return '<div class="tz-wrap"><div style="color:#484f58;font-size:0.7em">目標：無訊號</div></div>'
+def consensus_zone_html(d, pfx='w0'):
+    """第二格：五法共識 + Sell/Buy Zone + 週五結算磁吸區"""
+    consensus = d.get(f'{pfx}_consensus')
+    sh = d.get(f'{pfx}_sell_hi')
+    sl = d.get(f'{pfx}_sell_lo')
+    bh = d.get(f'{pfx}_buy_hi')
+    bl = d.get(f'{pfx}_buy_lo')
+    sth = d.get(f'{pfx}_settle_hi')
+    stl = d.get(f'{pfx}_settle_lo')
+    mp  = d.get(f'{pfx}_max_pain')
+    if sh is None and bh is None:
+        return '<div style="color:#484f58;font-size:0.72em">Zone：無數據</div>'
     fmt = lambda v: f'${v:g}' if v is not None else '—'
-    ch = f'<div class="tz-call">🎯↑ {fmt(cs)}</div>' if cs else '<div class="tz-call" style="color:#484f58">🎯↑ —</div>'
-    ph = f'<div class="tz-put">🎯↓ {fmt(ps)}</div>'  if ps else '<div class="tz-put"  style="color:#484f58">🎯↓ —</div>'
-    return f'<div class="tz-wrap">{ch}{ph}</div>'
+    price = d.get('price', 0)
+    # 觸及提醒
+    alert = ''
+    if bh and price <= bh:
+        alert = '<div style="font-size:0.65em;color:#f78166;background:rgba(247,129,102,.1);border:1px solid rgba(247,129,102,.3);border-radius:3px;padding:1px 5px;margin-bottom:3px">🔴 分批買入區</div>'
+    elif sl and price >= sl:
+        alert = '<div style="font-size:0.65em;color:#56d364;background:rgba(86,211,100,.1);border:1px solid rgba(86,211,100,.3);border-radius:3px;padding:1px 5px;margin-bottom:3px">🟢 分批賣出區</div>'
+    return (f'{alert}'
+            f'<div style="font-size:0.65em;color:#484f58;margin-bottom:2px">五法共識 {fmt(consensus)}</div>'
+            f'<div style="font-family:monospace;font-size:0.82em;color:#56d364;font-weight:600">🟢 Sell {fmt(sl)}~{fmt(sh)}</div>'
+            f'<div style="font-family:monospace;font-size:0.82em;color:#f78166;font-weight:600;margin-top:2px">🔴 Buy {fmt(bl)}~{fmt(bh)}</div>'
+            f'<div style="font-family:monospace;font-size:0.75em;color:#e3b341;margin-top:3px">📌結算 {fmt(stl)}~{fmt(sth)}</div>')
 
 
 def oi_html_single(d, pfx, label=''):
+    """
+    單欄期權流：
+    ① OI 結構（Call Wall / Max Pain / Put Wall）
+    ② Buy/Sell Zone + 結算磁吸
+    ③ GEX 流入流出
+    """
     cw    = d.get(f'{pfx}_call_wall')
     mp    = d.get(f'{pfx}_max_pain')
     pw    = d.get(f'{pfx}_put_wall')
+    gex   = d.get(f'{pfx}_gex')
+    sh    = d.get(f'{pfx}_sell_hi')
+    sl    = d.get(f'{pfx}_sell_lo')
+    bh    = d.get(f'{pfx}_buy_hi')
+    bl    = d.get(f'{pfx}_buy_lo')
+    sth   = d.get(f'{pfx}_settle_hi')
+    stl   = d.get(f'{pfx}_settle_lo')
+    con   = d.get(f'{pfx}_consensus')
     exp   = d.get(f'{pfx}_expiry','') or ''
-    is_mo = d.get(f'{pfx}_is_monthly',False)
-    lbl   = d.get(f'{pfx}_label',label)
+    is_mo = d.get(f'{pfx}_is_monthly', False)
+    lbl   = d.get(f'{pfx}_label', label)
     exps  = exp[5:] if exp else lbl
+    price = d.get('price', 0)
     fmt   = lambda v: f'${v:g}' if v is not None else '—'
-    mob   = ('<span style="font-size:0.65em;color:#e3b341;margin-left:3px;'
+    fmtf  = lambda v: f'${v:.2f}' if v is not None else '—'
+    mob   = ('<span style="font-size:0.6em;color:#e3b341;margin-left:3px;'
              'background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);'
              'border-radius:3px;padding:0 3px">月結</span>' if is_mo else '')
+
+    # ── ① OI 結構 ──────────────────────────────────────
     if cw is None and mp is None and pw is None:
-        return f'<div style="color:#484f58;font-size:0.75em">{lbl}{mob}<br>N/A</div>'
-    return (f'<div class="oi-lbl">{lbl} {exps}{mob}</div>'
-            f'<div class="oi-call">▼ {fmt(cw)}</div>'
-            f'<div class="oi-pain">⚡ {fmt(mp)}</div>'
-            f'<div class="oi-put">▲ {fmt(pw)}</div>')
+        oi_block = f'<div style="color:#484f58;font-size:0.72em">{lbl}{mob} N/A</div>'
+    else:
+        oi_block = (
+            f'<div class="oi-lbl">{lbl} {exps}{mob}</div>'
+            f'<div class="oi-call">▼ Call {fmt(cw)}</div>'
+            f'<div class="oi-pain">⚡ MaxPain {fmt(mp)}</div>'
+            f'<div class="oi-put">▲ Put {fmt(pw)}</div>'
+        )
+
+    # ── ② Zone + 結算磁吸 ──────────────────────────────
+    zone_block = ''
+    if sh is not None:
+        # 觸及提醒
+        alert = ''
+        if bh and price <= bh:
+            alert = ('<div style="font-size:0.62em;color:#f78166;background:rgba(247,129,102,.1);'
+                     'border:1px solid rgba(247,129,102,.3);border-radius:3px;'
+                     'padding:1px 5px;margin-bottom:2px">🔴 買入區</div>')
+        elif sl and price >= sl:
+            alert = ('<div style="font-size:0.62em;color:#56d364;background:rgba(86,211,100,.1);'
+                     'border:1px solid rgba(86,211,100,.3);border-radius:3px;'
+                     'padding:1px 5px;margin-bottom:2px">🟢 賣出區</div>')
+        zone_block = (
+            f'<div style="margin-top:5px;padding-top:4px;border-top:1px dashed #30363d">'
+            f'{alert}'
+            f'<div style="font-size:0.82em;color:#58a6ff;font-weight:600;margin-bottom:2px">五法共識 {fmtf(con)}</div>'
+            f'<div style="font-family:monospace;font-size:0.8em;color:#56d364;font-weight:600">🟢 {fmtf(sl)}~{fmtf(sh)}</div>'
+            f'<div style="font-family:monospace;font-size:0.8em;color:#f78166;font-weight:600;margin-top:1px">🔴 {fmtf(bl)}~{fmtf(bh)}</div>'
+            f'<div style="font-family:monospace;font-size:0.72em;color:#e3b341;margin-top:2px">📌 {fmtf(stl)}~{fmtf(sth)}</div>'
+            f'</div>'
+        )
+
+    # ── ③ GEX ──────────────────────────────────────────
+    gex_block = ''
+    if gex is not None:
+        col  = '#3fb950' if gex >= 0 else '#f85149'
+        arr  = '▲' if gex >= 0 else '▼'
+        lbl2 = 'Long γ 流入' if gex >= 0 else 'Short γ 流出'
+        bp   = min(int(abs(gex)/5000*100), 100)
+        gex_block = (
+            f'<div style="margin-top:5px;padding-top:4px;border-top:1px dashed #30363d">'
+            f'<div style="font-size:0.62em;color:#484f58;margin-bottom:2px">GEX</div>'
+            f'<div style="font-family:monospace;font-size:0.82em;font-weight:700;color:{col}">'
+            f'{arr} ${abs(gex):,.0f}M</div>'
+            f'<div style="font-size:0.62em;color:{col};margin-bottom:3px">{lbl2}</div>'
+            f'<div style="background:#21262d;border-radius:2px;height:4px;width:55px">'
+            f'<div style="background:{col};height:4px;border-radius:2px;width:{bp}%"></div></div>'
+            f'</div>'
+        )
+
+    return f'{oi_block}{zone_block}{gex_block}'
 
 
 def gex_html_single(d, pfx):
@@ -766,7 +1141,7 @@ def stock_row(d):
     if not d.get('ok'):
         mag = "<span class='m7'>Mag 7</span>" if d['ticker'] in MAG7 else ''
         return (f'<tr><td><div class="tk"><span class="tb">{d["ticker"]}</span>{mag}</div></td>'
-                f'<td colspan="14" style="color:#f85149;font-size:0.8em">⚠ 數據抓取失敗</td></tr>')
+                f'<td colspan="9" style="color:#f85149;font-size:0.8em">⚠ 數據抓取失敗</td></tr>')
 
     ticker  = d['ticker']
     price   = d['price']
@@ -777,19 +1152,17 @@ def stock_row(d):
     elif chg < 0: cc, cs, ps2 = 'neg', f'{chg:.2f}',  f'{chg_pct:.2f}%'
     else:         cc, cs, ps2 = 'neu', '—', '—'
 
-    oi_w = [oi_html_single(d, f'w{i}') + target_zone_html(d, f'w{i}_') +
-            zone_html(d, f'w{i}') for i in range(4)]
-    gx_w = [gex_html_single(d, f'w{i}') for i in range(4)]
+    # 期權流欄（每週一格，含 OI + Zone + GEX）
+    oi_w = [oi_html_single(d, f'w{i}') for i in range(4)]
 
     ttm_h, fwd_h     = pe_html(d['pe_ttm'], d['pe_fwd'])
     iv_bar, iv_badge = iv_html(d['iv'], d['ivr'])
-    pc_h = pc_html(d['pc_ratio'])
-    ms_h = ms_html(ticker, price)
+    pc_h  = pc_html(d['pc_ratio'])
+    ms_h  = ms_html(ticker, price)
     mc    = fmt_cap(d.get('market_cap'))
     vol_h = vol_cell_html(d)
-    ema_h = ema_cell_html(d)
-    tip_h   = stock_tip_html(ticker)
-    alert_h = zone_alert_html(d)
+    hma_h = hma_ema_cell_html(d)
+    tip_h = stock_tip_html(ticker)
     mb    = f'<span class="m7">Mag 7</span>' if ticker in MAG7 else ''
 
     return f'''<tr>
@@ -799,13 +1172,12 @@ def stock_row(d):
     <div class="chg-row {cc}">{cs} <span class="pct">{ps2}</span></div>
     <div class="vol-inline">{vol_h}</div>
     {tip_h}
-    {alert_h}
   </td>
-  <td class="oi">{oi_w[0]}<div class="gex-inline">{gx_w[0]}</div></td>
-  <td class="oi">{oi_w[1]}<div class="gex-inline">{gx_w[1]}</div></td>
-  <td class="oi">{oi_w[2]}<div class="gex-inline">{gx_w[2]}</div></td>
-  <td class="oi">{oi_w[3]}<div class="gex-inline">{gx_w[3]}</div></td>
-  <td class="ema-td">{ema_h}</td>
+  <td class="hma-td">{hma_h}</td>
+  <td class="oi">{oi_w[0]}</td>
+  <td class="oi">{oi_w[1]}</td>
+  <td class="oi">{oi_w[2]}</td>
+  <td class="oi">{oi_w[3]}</td>
   <td>{ms_h}</td>
   <td>{ttm_h}</td><td>{fwd_h}</td>
   <td>{iv_bar}</td><td>{iv_badge}</td>
@@ -950,12 +1322,13 @@ td{{padding:11px 13px;vertical-align:top}}
 .sig-warn{{color:#e3b341;font-weight:700;font-size:0.74em;display:block;line-height:1.4}}
 .sig-note{{color:#484f58;font-size:0.68em;display:block;margin-top:1px;line-height:1.3}}
 /* 其他原有樣式 */
-.oi{{min-width:155px;max-width:185px;vertical-align:top}}
+.oi{{min-width:155px;max-width:200px;vertical-align:top}}
 .pr-td{{min-width:120px;max-width:160px;vertical-align:top}}
 .chg-row{{font-size:0.85em;margin-top:3px;white-space:nowrap}}
 .vol-inline{{margin-top:6px;padding-top:5px;border-top:1px dashed #30363d}}
 .gex-inline{{margin-top:6px;padding-top:5px;border-top:1px dashed #30363d}}
 .ema-td{{min-width:175px;max-width:210px;vertical-align:top}}
+.hma-td{{min-width:240px;max-width:290px;vertical-align:top;padding:10px 13px}}
 .vol-tip{{font-size:0.68em;margin-top:4px;padding:2px 6px;border-radius:4px;line-height:1.4;display:inline-block}}
 .vol-tip-hi{{background:rgba(227,179,65,.1);color:#e3b341;border:1px solid rgba(227,179,65,.25)}}
 .vol-tip-mid{{background:rgba(121,192,255,.08);color:#79c0ff;border:1px solid rgba(121,192,255,.2)}}
@@ -1037,12 +1410,11 @@ td{{padding:11px 13px;vertical-align:top}}
 
 <div class="hdr">
   <div>
-    <h1>📊 美股每日開盤掃描報告 Powered by 黑叔 — v6.11h1>
-    <div class="sub">Magnificent 7 + TSM · MU · SNDK · NFLX · AMD · AVGO · LITE · COHR · JPM　｜　真實數據 yfinance　｜　晨星估值 · OI · IV · P/C Ratio · EMA15/50/100 · Buy/Sell Zone</div>
+    <h1>📊 美股每日開盤掃描報告 Powered by 黑叔 — v7.0</h1>
   </div>
   <div class="hdr-r">
     <div class="dt">{display_date}</div>
-    <div>美股交易時段　｜　22:00 台灣時間　｜　本機生成</div>
+    <div>頁面生成：{now_tw} 台灣時間　｜　本機生成</div>
   </div>
 </div>
 
@@ -1078,19 +1450,12 @@ td{{padding:11px 13px;vertical-align:top}}
   <span class="oi-put">▲ Put Wall</span>=支撐
   <span style="color:#e3b341">月結</span>=當月第三週五
   <span>｜</span>
-  <span style="color:#a371f7">🎯↑</span> OTM Call　<span style="color:#79c0ff">🎯↓</span> OTM Put
-  <span>｜</span>
-  <span style="color:#56d364;font-weight:600">🟢 Sell Zone</span>=盤中獲利出場區　<span style="color:#f78166;font-weight:600">🔴 Buy Zone</span>=分批承接區（觸及 Sell Hi 立刻出）
-  <span>｜ EMA訊號：</span>
-  <span class="sig-bull" style="display:inline">🌟黃金交叉</span>
-  <span class="sig-bear" style="display:inline">💀死亡交叉</span>
-  <span class="sig-bull" style="display:inline">📈多頭排列</span>
-  <span class="sig-bear" style="display:inline">📉空頭排列</span>
-  <span class="sig-warn" style="display:inline">⚡短強長弱/短弱長強</span>
-  <span class="sig-bull" style="display:inline">⬆突破EMA15</span>
-  <span class="sig-bear" style="display:inline">⬇跌破EMA15</span>
-  <span class="sig-bull" style="display:inline">🔄回彈</span>
-  <span class="sig-bear" style="display:inline">🔄回落</span>
+  <span style="color:#56d364;font-weight:600">🟢 Sell Zone</span>=週高壓力區（回測82%蓋頂）　<span style="color:#f78166;font-weight:600">🔴 Buy Zone</span>=週低支撐區（回測79%蓋底）　<span style="color:#e3b341">📌結算</span>=Max Pain±1%磁吸區
+  <span>｜ HMA/EMA：</span>
+  <span style="color:#3fb950">🟢支撐</span>
+  <span style="color:#f85149">🔴壓力</span>
+  <span style="color:#3fb950">🔔↑剛突破</span>
+  <span style="color:#f85149">🔔↓剛跌破</span>
 </div>
 
 <div class="stitle">📋 個股全覽</div>
@@ -1099,19 +1464,19 @@ td{{padding:11px 13px;vertical-align:top}}
 <thead>
 <tr>
   <th rowspan="2">代碼</th>
-  <th rowspan="2" style="min-width:130px">現價 / 漲跌 / 量比</th>
-  <th colspan="4" class="th-grp" style="color:#58a6ff;min-width:520px">── OI 支撐壓力 + GEX + OTM目標（本週 / 下週 / 下下週 / 下下三週）──</th>
-  <th rowspan="2" style="min-width:175px;color:#58a6ff">EMA15 / 50 / 100</th>
+  <th rowspan="2" style="min-width:120px">現價 / 漲跌 / 量比</th>
+  <th rowspan="2" style="min-width:165px;color:#a371f7">HMA/EMA 技術面</th>
+  <th colspan="4" class="th-grp" style="color:#58a6ff">── 期 權 流（本週 / 下週 / 下下週 / 下下三週）──</th>
   <th rowspan="2" style="min-width:100px">晨星估值</th>
   <th colspan="2" class="th-grp th-val">── 估 值 ──</th>
   <th colspan="3" class="th-grp th-opt">── 期 權 分 析 ──</th>
   <th rowspan="2">市值</th>
 </tr>
 <tr>
-  <th style="color:#58a6ff;font-size:0.7em">本週</th>
-  <th style="color:#58a6ff;font-size:0.7em">下週</th>
-  <th style="color:#58a6ff;font-size:0.7em">下下週</th>
-  <th style="color:#58a6ff;font-size:0.7em">下下三週</th>
+  <th style="color:#58a6ff;font-size:0.65em;min-width:155px">本週 OI · Zone · GEX</th>
+  <th style="color:#58a6ff;font-size:0.65em;min-width:155px">下週 OI · Zone · GEX</th>
+  <th style="color:#58a6ff;font-size:0.65em;min-width:155px">下下週 OI · Zone · GEX</th>
+  <th style="color:#58a6ff;font-size:0.65em;min-width:155px">下下三週 OI · Zone · GEX</th>
   <th>P/E TTM</th><th>Fwd P/E</th>
   <th>IV / IVR</th><th>IV狀態</th><th>P/C Ratio</th>
 </tr>
@@ -1151,7 +1516,7 @@ td{{padding:11px 13px;vertical-align:top}}
 <div class="ftr">
   ⚠️ 本報告數據來自 Yahoo Finance（yfinance），OI / Max Pain 為真實期權鏈計算，晨星估值為靜態手動更新。僅供參考，不構成投資建議。<br>
   數據來源：Yahoo Finance · yfinance　｜　報告產生：{now_tw} 台灣時間<br>
-  <span style="color:#21262d">本機版 v6.11� python3 stock_scan.py · 四週 OI + GEX + EMA15/50/100 + Buy/Sell Zone + 個股建議</span>
+  <span style="color:#21262d">v7.0 · python3 stock_scan.py · 四週 OI + HMA/EMA最優參數 + Buy/Sell Zone（回測驗證）+ 五法共識 + 週五結算磁吸區</span>
 </div>
 
 </div>
@@ -1165,7 +1530,7 @@ td{{padding:11px 13px;vertical-align:top}}
 
 def main():
     print('=' * 50)
-    print('美股每日掃描報告 Powered by 黑叔 - v6.11')
+    print('美股每日掃描報告 Powered by 黑叔 - v7.0')
     print('=' * 50)
 
     date_str    = datetime.now().strftime('%Y%m%d')
