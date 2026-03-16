@@ -2,7 +2,7 @@ name: Daily Stock Report
 
 on:
   schedule:
-    - cron: '35 13 * * 1-5'
+        - cron: '45 14 * * 1-5'
   workflow_dispatch:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
