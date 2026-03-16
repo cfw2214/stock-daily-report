@@ -424,6 +424,83 @@ def section(title):
     print(f"{'='*66}")
 
 
+
+
+def _print_smart_money_analysis(S: float, c_prem_tgt, c_delta_tgt):
+    """
+    聰明錢 Premium / Delta 加權附註分析
+    研究結論（2026-03-16）：
+      Premium > Delta → 機構買高IV遠端Call，賭大波動
+      Delta > Premium → 機構買近端ATM Call，純押方向
+      兩者相同      → 資金與方向一致，訊號可信度高
+      高於現價$5~15 → 正常多頭，機構押週高目標在此
+      接近現價±$2   → 中性，機構觀望或對沖
+      低於現價      → 警訊：機構ITM對沖，市場防守偏空
+    """
+    section("💡 聰明錢 Premium / Delta 分析")
+
+    p = c_prem_tgt
+    d = c_delta_tgt
+
+    # ── 數值顯示 ──────────────────────────────────────────
+    p_str = f'${p:.2f}' if p is not None else 'N/A（非交易時段/無大單）'
+    d_str = f'${d:.2f}' if d is not None else 'N/A（非交易時段/無大單）'
+    print(f"  聰明錢 Premium 加權 : {p_str}")
+    print(f"  聰明錢 Delta   加權 : {d_str}")
+    print()
+
+    # ── 無數據時說明 ──────────────────────────────────────
+    if p is None and d is None:
+        print("  ⚪ 目前無聰明錢大單（volume=0 或不符合 Vol/OI>0.3 條件）")
+        print("     非交易時段或低流動性期間為正常現象，開盤後數據會更新")
+        return
+
+    # ── Premium vs Delta 關係分析 ─────────────────────────
+    if p is not None and d is not None:
+        diff = p - d
+        if abs(diff) <= 1.0:
+            rel_msg = "✅ 資金與方向高度一致，訊號可信度高"
+            rel_note = "機構押注集中，方向明確"
+        elif diff > 1.0:
+            rel_msg = "📊 Premium > Delta：機構在買高IV遠端Call"
+            rel_note = "賭大波動幅度，不只是押方向（隱含波動率偏高）"
+        else:
+            rel_msg = "🎯 Delta > Premium：機構在買近端ATM Call"
+            rel_note = "純押方向性多頭，不押波動率（乾淨的方向訊號）"
+        print(f"  【Premium vs Delta】{rel_msg}")
+        print(f"     {rel_note}")
+        print()
+
+    # ── 各指標 vs 現價分析 ────────────────────────────────
+    for label, val in [('Premium加權', p), ('Delta 加權', d)]:
+        if val is None:
+            continue
+        gap = val - S
+        gap_pct = gap / S * 100
+
+        if gap > 5:
+            direction = '📈 上漲'
+            if gap <= 15:
+                signal = f'正常多頭區間（高於現價 ${gap:.1f} / +{gap_pct:.1f}%）'
+                advice = '機構押週高目標在此，可視為本週阻力參考，Sell Zone 上緣附近獲利'
+            else:
+                signal = f'偏樂觀（高於現價 ${gap:.1f} / +{gap_pct:.1f}%，超過$15屬偏激進）'
+                advice = '大單聰明錢押更遠目標，波動率預期偏高，注意是否有催化劑（財報/消息）'
+        elif gap >= -2:
+            direction = '⚪ 中性'
+            signal = f'接近現價（差 ${gap:+.1f} / {gap_pct:+.1f}%）'
+            advice = '機構觀望或以對沖為主，方向訊號偏弱，等待突破確認'
+        else:
+            direction = '📉 下跌警訊'
+            signal = f'低於現價（差 ${gap:.1f} / {gap_pct:.1f}%）'
+            advice = '機構買入ITM Call做Delta對沖，或市場整體偏防守；偏空訊號，注意下行風險'
+
+        print(f"  【{label}】{direction}")
+        print(f"     ${val:.2f}  →  {signal}")
+        print(f"     建議：{advice}")
+        print()
+
+
 def _print_hma_section(ticker: str, S: float, hma_data: dict):
     """輸出 HMA/EMA 技術面支撐壓力區塊（v3：動態角色 + 盤整 + 中期趨勢概率）"""
     section(f"📐 HMA/EMA 技術面支撐壓力 — {ticker}")
@@ -870,6 +947,9 @@ def analyze(ticker, target_expiry=None, rate=0.053):
   ║  IV Skew : {skew_str:<8}  {tail_str:<20}              ║
   ╚═══════════════════════════════════════════════════════╝
 """)
+
+    # ── 聰明錢 Premium / Delta 附註分析 ──────────────────
+    _print_smart_money_analysis(S, c_prem_tgt, c_delta_tgt)
 
     # ── HMA / EMA 技術面支撐壓力輸出 ─────────────────────
     _print_hma_section(ticker, S, hma_data)

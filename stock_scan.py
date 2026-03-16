@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-美股每日開盤掃描報告 Powered by 黑叔 — v7.1
+美股每日開盤掃描報告 Powered by 黑叔 — v7.2
 HMA/短EMA/大EMA 最優參數支撐壓力 | 期權流五法共識 | Buy/Sell Zone（回測驗證係數）
 使用 yfinance 抓取真實股價、期權 OI、IV、P/C Ratio、HMA/EMA 數據
 執行方式：python3 stock_scan.py
@@ -253,6 +253,29 @@ def get_four_weekly_expiries():
         results.append({'label': label, 'date': friday.strftime('%Y-%m-%d'),
                         'is_monthly': (friday == third_fri)})
     return results
+
+
+RISK_FREE_RATE = 0.053  # 無風險利率（與 flow_analysis.py 一致）
+
+
+def _bs_gamma(S, K, T, sigma):
+    """BS Gamma（模組級，供 GEX map 精確計算用）"""
+    if T <= 0 or sigma <= 0 or K <= 0: return 0.0
+    try:
+        d1 = (math.log(S/K) + 0.5*sigma**2*T) / (sigma*math.sqrt(T))
+        return math.exp(-0.5*d1**2) / (math.sqrt(2*math.pi)*S*sigma*math.sqrt(T))
+    except: return 0.0
+
+
+def _bs_price_s(S, K, T, r, sigma, opt='call'):
+    """BS 理論中間價（供 straddle 精確計算用，對齊 flow_analysis.py）"""
+    if T <= 0 or sigma <= 0: return max(0.0, S-K) if opt=='call' else max(0.0, K-S)
+    try:
+        _nc = lambda x: 0.5*(1+math.erf(x/math.sqrt(2)))
+        d1 = (math.log(S/K)+(r+0.5*sigma**2)*T)/(sigma*math.sqrt(T)); d2=d1-sigma*math.sqrt(T)
+        if opt=='call': return S*_nc(d1)-K*math.exp(-r*T)*_nc(d2)
+        return K*math.exp(-r*T)*_nc(-d2)-S*_nc(-d1)
+    except: return 0.0
 
 
 def calc_gex(calls_df, puts_df, current_price):
@@ -514,53 +537,95 @@ def fetch_stock(ticker):
                     d[f'{k}_gex']       = calc_gex(cdf, pdf, price)
                     last_calls = cdf; last_puts = pdf
 
-                    # ── Buy/Sell Zone v4.1（回測修正：排除CallWall + 硬下限）─
+                    # ── Buy/Sell Zone v4.1 + 五法共識（對齊 flow_analysis.py）─
                     try:
                         mp = res.get('max_pain') or price
-                        atm_idx = (cdf['strike'] - price).abs().argsort()[:3]
+
+                        # ── Straddle（BS mid price × 0.85，對齊 flow_analysis.py）─
+                        # flow_analysis 用 BS 理論中間價，而非 lastPrice
+                        # lastPrice 受市價報價影響常偏高，BS mid 更精準
+                        T_zone = max((datetime.strptime(d.get(f'{k}_expiry', '') or
+                                      (datetime.now()+timedelta(days=5)).strftime('%Y-%m-%d'),
+                                      '%Y-%m-%d') - datetime.now()).days, 1) / 252
+                        atm_idx = (cdf['strike'] - price).abs().argsort()[:1]
                         atm_c   = cdf.iloc[atm_idx]
-                        atm_p   = pdf.iloc[(pdf['strike'] - price).abs().argsort()[:3]]
-                        c_mid   = pd.to_numeric(atm_c['lastPrice'], errors='coerce').mean()
-                        p_mid   = pd.to_numeric(atm_p['lastPrice'], errors='coerce').mean()
-                        straddle = (c_mid + p_mid) * 0.85 if (c_mid > 0 and p_mid > 0) else price * 0.04
-                        cs = straddle * 0.55  # conservative straddle
-                        # GEX 最大阻力/支撐（排除 Call Wall）
-                        try:
-                            gex_map = {}
-                            for _, row in cdf.iterrows():
+                        atm_p   = pdf.iloc[(pdf['strike'] - price).abs().argsort()[:1]]
+                        def _bs_mid(row, opt):
+                            K  = float(row.get('strike', price))
+                            iv = float(row.get('impliedVolatility', 0) or 0) or 0.5
+                            return _bs_price_s(price, K, T_zone, RISK_FREE_RATE, iv, opt)
+                        atm_c_mid = float(atm_c.apply(lambda r: _bs_mid(r,'call'), axis=1).mean())
+                        atm_p_mid = float(atm_p.apply(lambda r: _bs_mid(r,'put'),  axis=1).mean())
+                        straddle = (atm_c_mid + atm_p_mid) * 0.85 if (atm_c_mid > 0 and atm_p_mid > 0) else price * 0.04
+                        cs = straddle * 0.55
+
+                        # ── GEX map：真實 BS Gamma（對齊 flow_analysis.py）───
+                        gex_map = {}
+                        for _, row in cdf.iterrows():
+                            k2  = float(row.get('strike', 0))
+                            oi2 = float(row.get('openInterest', 0) or 0)
+                            iv2 = float(row.get('impliedVolatility', 0) or 0) or 0.5
+                            gx  = oi2 * _bs_gamma(price, k2, T_zone, iv2) * 100 * price * price
+                            gex_map[k2] = gex_map.get(k2, 0) + gx
+                        for _, row in pdf.iterrows():
+                            k2  = float(row.get('strike', 0))
+                            oi2 = float(row.get('openInterest', 0) or 0)
+                            iv2 = float(row.get('impliedVolatility', 0) or 0) or 0.5
+                            gx  = oi2 * _bs_gamma(price, k2, T_zone, iv2) * 100 * price * price
+                            gex_map[k2] = gex_map.get(k2, 0) - gx
+                        resist_2  = max(gex_map, key=gex_map.get) if gex_map else None
+                        support_2 = min(gex_map, key=gex_map.get) if gex_map else None
+
+                        # ── 聰明錢：Vol/OI > 0.3，Call > 10k 股，Put > 5k 股 ─
+                        def _smart_weighted(df, vol_thr):
+                            rows = []
+                            for _, row in df.iterrows():
+                                v  = float(row.get('volume', 0) or 0)
+                                oi = float(row.get('openInterest', 0) or 0)
+                                lp = float(row.get('lastPrice', 0) or 0)
                                 k2 = float(row.get('strike', 0))
-                                gex_map[k2] = gex_map.get(k2, 0) + float(row.get('openInterest', 0) or 0)
-                            for _, row in pdf.iterrows():
-                                k2 = float(row.get('strike', 0))
-                                gex_map[k2] = gex_map.get(k2, 0) - float(row.get('openInterest', 0) or 0)
-                            resist_2 = max(gex_map, key=gex_map.get) if gex_map else None
-                            support_2 = min(gex_map, key=gex_map.get) if gex_map else None
-                        except Exception:
-                            resist_2 = None; support_2 = None
-                        # Sell Zone — 排除CallWall，硬下限 S×1.005
+                                if oi > 0 and v / oi > 0.3 and v > vol_thr and lp > 0:
+                                    prem = v * lp * 100
+                                    rows.append((k2, prem))
+                            total = sum(p for _, p in rows)
+                            return sum(k2 * p for k2, p in rows) / total if total > 0 else None
+
+                        c_prem_tgt  = _smart_weighted(cdf, 10_000)
+                        c_delta_tgt = _smart_weighted(cdf,  5_000)  # 寬鬆版 delta 加權近似
+
+                        # ── 五法共識（完整對齊 flow_analysis.py）───────────
+                        # [MaxPain, GEX最大阻力strike, S+straddle, 聰明錢Premium加權, 聰明錢Delta加權]
+                        five_vals = [v for v in [mp, resist_2, price + straddle,
+                                                  c_prem_tgt, c_delta_tgt] if v is not None]
+                        consensus = round(sum(five_vals) / len(five_vals), 2) if five_vals else None
+                        conf_n = len(five_vals)
+                        d[f'{k}_consensus'] = consensus
+                        d[f'{k}_conf_n']    = conf_n   # 有效法數（最多5）
+
+                        # ── Sell Zone / Buy Zone（v4.1）─────────────────────
                         sell_lo = round(mp * 1.005, 2) if mp else round(price * 1.005, 2)
                         cands_s = [v for v in [resist_2, price + cs] if v is not None]
                         sell_hi = round(min(cands_s), 2) if cands_s else round(price * 1.03, 2)
                         sell_hi = max(sell_hi, round(price * 1.005, 2))
                         if sell_hi <= sell_lo: sell_hi = round(sell_lo * 1.015, 2)
-                        # Buy Zone
                         buy_hi = round(mp * 0.995, 2) if mp else round(price * 0.995, 2)
                         cands_b = [v for v in [support_2, price - cs] if v is not None]
                         buy_lo  = round(max(cands_b), 2) if cands_b else round(price * 0.97, 2)
                         buy_lo  = min(buy_lo, round(price * 0.995, 2))
                         if buy_lo >= buy_hi: buy_lo = round(buy_hi * 0.985, 2)
-                        d[f'{k}_sell_lo'] = sell_lo
-                        d[f'{k}_sell_hi'] = sell_hi
-                        d[f'{k}_buy_lo']  = buy_lo
-                        d[f'{k}_buy_hi']  = buy_hi
-                        # 週五結算磁吸區 = Max Pain ± 1%
+
+                        d[f'{k}_sell_lo']   = sell_lo
+                        d[f'{k}_sell_hi']   = sell_hi
+                        d[f'{k}_buy_lo']    = buy_lo
+                        d[f'{k}_buy_hi']    = buy_hi
                         d[f'{k}_settle_lo'] = round(mp * 0.99, 2)
                         d[f'{k}_settle_hi'] = round(mp * 1.01, 2)
                         d[f'{k}_max_pain']  = res.get('max_pain')
-                        # 五法共識 v4.1（回測最優：平均誤差1.15%）= (MaxPain + S+straddle + CallWall) / 3
-                        cw_val = res.get('call_wall')
-                        con_vals = [v for v in [mp, price + straddle, cw_val] if v is not None]
-                        d[f'{k}_consensus'] = round(sum(con_vals) / len(con_vals), 2) if con_vals else None
+                        d[f'{k}_gex_resist']  = round(resist_2,  2) if resist_2  is not None else None
+                        d[f'{k}_gex_support'] = round(support_2, 2) if support_2 is not None else None
+                        d[f'{k}_c_prem']      = round(c_prem_tgt, 2) if c_prem_tgt is not None else None
+                        d[f'{k}_c_delta']     = round(c_delta_tgt,2) if c_delta_tgt is not None else None
+
                     except Exception as ez:
                         print(f'    Zone計算錯誤[{i}]: {ez}')
                     mo = '★月結' if wk['is_monthly'] else ''
@@ -642,24 +707,50 @@ def fetch_spy_qqq():
                     entry[f'{k}_max_pain']=res.get('max_pain')
                     mo='★月結' if wk['is_monthly'] else ''
                     print(f'    {sym} {wk["label"]}{mo} ({entry[f"{k}_expiry"]}) Put:{entry[f"{k}_put_wall"]} Pain:{entry[f"{k}_max_pain"]} Call:{entry[f"{k}_call_wall"]}')
-                    # Buy/Sell Zone v4.1（排除CallWall + 硬下限）
+                    # Buy/Sell Zone v4.1 + 五法共識（對齊 flow_analysis.py）
                     try:
                         mp = res.get('max_pain') or price
-                        atm_c = cdf.iloc[(cdf['strike']-price).abs().argsort()[:3]]
-                        atm_p = pdf.iloc[(pdf['strike']-price).abs().argsort()[:3]]
-                        c_mid = pd.to_numeric(atm_c['lastPrice'],errors='coerce').mean()
-                        p_mid = pd.to_numeric(atm_p['lastPrice'],errors='coerce').mean()
-                        st = (c_mid+p_mid)*0.85 if (c_mid>0 and p_mid>0) else price*0.03
+                        # Straddle 用 BS mid price（對齊 flow_analysis.py）
+                        T_etf = max((datetime.strptime(res.get('expiry','') or
+                                     (datetime.now()+timedelta(days=5)).strftime('%Y-%m-%d'),
+                                     '%Y-%m-%d') - datetime.now()).days, 1) / 252
+                        atm_c = cdf.iloc[(cdf['strike']-price).abs().argsort()[:1]]
+                        atm_p = pdf.iloc[(pdf['strike']-price).abs().argsort()[:1]]
+                        def _etf_bs_mid(row, opt):
+                            K=float(row.get('strike',price)); iv=float(row.get('impliedVolatility',0) or 0) or 0.5
+                            return _bs_price_s(price,K,T_etf,RISK_FREE_RATE,iv,opt)
+                        c_mid_etf=float(atm_c.apply(lambda r:_etf_bs_mid(r,'call'),axis=1).mean())
+                        p_mid_etf=float(atm_p.apply(lambda r:_etf_bs_mid(r,'put'), axis=1).mean())
+                        st=(c_mid_etf+p_mid_etf)*0.85 if (c_mid_etf>0 and p_mid_etf>0) else price*0.03
                         cs = st * 0.55
-                        try:
-                            gm = {}
-                            for _, row in cdf.iterrows():
-                                k2=float(row.get('strike',0)); gm[k2]=gm.get(k2,0)+float(row.get('openInterest',0) or 0)
-                            for _, row in pdf.iterrows():
-                                k2=float(row.get('strike',0)); gm[k2]=gm.get(k2,0)-float(row.get('openInterest',0) or 0)
-                            r2=max(gm,key=gm.get) if gm else None
-                            s2=min(gm,key=gm.get) if gm else None
-                        except Exception: r2=None; s2=None
+                        # GEX map（真實 BS Gamma）
+                        gm = {}
+                        for _, row in cdf.iterrows():
+                            k2=float(row.get('strike',0)); oi2=float(row.get('openInterest',0) or 0)
+                            iv2=float(row.get('impliedVolatility',0) or 0) or 0.5
+                            gm[k2]=gm.get(k2,0)+oi2*_bs_gamma(price,k2,T_etf,iv2)*100*price*price
+                        for _, row in pdf.iterrows():
+                            k2=float(row.get('strike',0)); oi2=float(row.get('openInterest',0) or 0)
+                            iv2=float(row.get('impliedVolatility',0) or 0) or 0.5
+                            gm[k2]=gm.get(k2,0)-oi2*_bs_gamma(price,k2,T_etf,iv2)*100*price*price
+                        r2=max(gm,key=gm.get) if gm else None
+                        s2=min(gm,key=gm.get) if gm else None
+                        # 聰明錢加權
+                        def _sw(df, vol_thr):
+                            rows=[(float(r.get('strike',0)), float(r.get('volume',0) or 0)*float(r.get('lastPrice',0) or 0)*100)
+                                  for _,r in df.iterrows()
+                                  if float(r.get('openInterest',0) or 0)>0
+                                  and float(r.get('volume',0) or 0)/float(r.get('openInterest',0) or 1)>0.3
+                                  and float(r.get('volume',0) or 0)>vol_thr
+                                  and float(r.get('lastPrice',0) or 0)>0]
+                            tot=sum(p for _,p in rows)
+                            return sum(k2*p for k2,p in rows)/tot if tot>0 else None
+                        c_prem=_sw(cdf,10_000); c_delt=_sw(cdf,5_000)
+                        # 五法共識
+                        five=[v for v in [mp, r2, price+st, c_prem, c_delt] if v is not None]
+                        entry[f'{k}_consensus']=round(sum(five)/len(five),2) if five else None
+                        entry[f'{k}_conf_n']=len(five)
+                        # Sell/Buy Zone
                         sell_lo=round(mp*1.005,2) if mp else round(price*1.005,2)
                         cands_s=[v for v in [r2, price+cs] if v is not None]
                         sell_hi=round(min(cands_s),2) if cands_s else round(price*1.03,2)
@@ -674,10 +765,10 @@ def fetch_spy_qqq():
                         entry[f'{k}_buy_lo']=buy_lo;   entry[f'{k}_buy_hi']=buy_hi
                         entry[f'{k}_settle_lo']=round(mp*0.99,2)
                         entry[f'{k}_settle_hi']=round(mp*1.01,2)
-                        # 五法共識 v4.1 = (MaxPain + price+straddle + CallWall) / 3
-                        cw_etf = res.get('call_wall')
-                        con_etf = [v for v in [mp, price+st, cw_etf] if v is not None]
-                        entry[f'{k}_consensus'] = round(sum(con_etf)/len(con_etf), 2) if con_etf else None
+                        entry[f'{k}_gex_resist']  = round(r2,  2) if r2  is not None else None
+                        entry[f'{k}_gex_support'] = round(s2,  2) if s2  is not None else None
+                        entry[f'{k}_c_prem']      = round(c_prem, 2) if c_prem is not None else None
+                        entry[f'{k}_c_delta']     = round(c_delt,  2) if c_delt  is not None else None
                     except: pass
                 except Exception as e: print(f'    {sym} {wk["label"]}錯誤:{e}')
             result[sym]=entry
@@ -1092,13 +1183,14 @@ def consensus_zone_html(d, pfx='w0'):
 def oi_html_single(d, pfx, label=''):
     """
     單欄期權流：
-    ① OI 結構（Call Wall / Max Pain / Put Wall）
-    ② Buy/Sell Zone + 結算磁吸
-    ③ GEX 流入流出
+    ① GEX 阻力 / Max Pain / GEX 支撐（取代舊 Call/Put Wall）
+    ② 聰明錢 Premium / Delta + 狀態建議
+    ③ Buy/Sell Zone + 結算磁吸
+    ④ GEX 流入流出
     """
-    cw    = d.get(f'{pfx}_call_wall')
+    gr    = d.get(f'{pfx}_gex_resist')   # GEX 最大阻力 strike
     mp    = d.get(f'{pfx}_max_pain')
-    pw    = d.get(f'{pfx}_put_wall')
+    gs    = d.get(f'{pfx}_gex_support')  # GEX 最大支撐 strike
     gex   = d.get(f'{pfx}_gex')
     sh    = d.get(f'{pfx}_sell_hi')
     sl    = d.get(f'{pfx}_sell_lo')
@@ -1107,6 +1199,8 @@ def oi_html_single(d, pfx, label=''):
     sth   = d.get(f'{pfx}_settle_hi')
     stl   = d.get(f'{pfx}_settle_lo')
     con   = d.get(f'{pfx}_consensus')
+    cp    = d.get(f'{pfx}_c_prem')       # 聰明錢 Premium 加權
+    cd    = d.get(f'{pfx}_c_delta')      # 聰明錢 Delta 加權
     exp   = d.get(f'{pfx}_expiry','') or ''
     is_mo = d.get(f'{pfx}_is_monthly', False)
     lbl   = d.get(f'{pfx}_label', label)
@@ -1118,21 +1212,65 @@ def oi_html_single(d, pfx, label=''):
              'background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);'
              'border-radius:3px;padding:0 3px">月結</span>' if is_mo else '')
 
-    # ── ① OI 結構 ──────────────────────────────────────
-    if cw is None and mp is None and pw is None:
+    # ── ① OI 結構（GEX 阻力 / MaxPain / GEX 支撐）──────
+    if gr is None and mp is None and gs is None:
         oi_block = f'<div style="color:#484f58;font-size:0.72em">{lbl}{mob} N/A</div>'
     else:
         oi_block = (
             f'<div class="oi-lbl">{lbl} {exps}{mob}</div>'
-            f'<div class="oi-call">▼ Call {fmt(cw)}</div>'
+            f'<div class="oi-call">▼ GEX阻力 {fmt(gr)}</div>'
             f'<div class="oi-pain">⚡ MaxPain {fmt(mp)}</div>'
-            f'<div class="oi-put">▲ Put {fmt(pw)}</div>'
+            f'<div class="oi-put">▲ GEX支撐 {fmt(gs)}</div>'
         )
 
-    # ── ② Zone + 結算磁吸 ──────────────────────────────
+    # ── ② 聰明錢 Premium / Delta + 狀態建議 ────────────
+    smart_block = ''
+    if cp is not None or cd is not None:
+        # 聰明錢狀態建議
+        def _smart_status(val, label):
+            if val is None: return ''
+            gap = val - price
+            if gap > 5:
+                if gap <= 15:
+                    icon, col, note = '📈', '#3fb950', f'多頭 +{gap:.1f} 機構押週高'
+                else:
+                    icon, col, note = '📈', '#58a6ff', f'激進 +{gap:.1f} 注意催化劑'
+            elif gap >= -2:
+                icon, col, note = '⚪', '#8b949e', f'中性 {gap:+.1f} 觀望對沖'
+            else:
+                icon, col, note = '📉', '#f85149', f'警訊 {gap:.1f} ITM對沖偏空'
+            return (f'<div style="display:flex;justify-content:space-between;'
+                    f'align-items:baseline;white-space:nowrap;margin-top:2px">'
+                    f'<span style="font-size:0.6em;color:#484f58">{label}</span>'
+                    f'<span style="font-family:monospace;font-size:0.75em;font-weight:700;'
+                    f'color:{col};margin-left:4px">{fmtf(val)}</span>'
+                    f'</div>'
+                    f'<div style="font-size:0.6em;color:{col};margin-bottom:2px">'
+                    f'{icon} {note}</div>')
+
+        # Premium vs Delta 關係
+        rel_note = ''
+        if cp is not None and cd is not None:
+            diff = cp - cd
+            if abs(diff) <= 1.0:
+                rel_note = '<div style="font-size:0.58em;color:#e3b341;margin-top:1px">✅ 資金方向一致，訊號強</div>'
+            elif diff > 1.0:
+                rel_note = '<div style="font-size:0.58em;color:#8b949e;margin-top:1px">📊 Prem>Delta：賭大波動</div>'
+            else:
+                rel_note = '<div style="font-size:0.58em;color:#58a6ff;margin-top:1px">🎯 Delta>Prem：純押方向</div>'
+
+        smart_block = (
+            f'<div style="margin-top:5px;padding-top:4px;border-top:1px dashed #30363d">'
+            f'<div style="font-size:0.6em;color:#484f58;letter-spacing:0.5px;margin-bottom:2px">聰明錢</div>'
+            f'{_smart_status(cp, "💰 Premium加權")}'
+            f'{_smart_status(cd, "⚡ Delta 加權")}'
+            f'{rel_note}'
+            f'</div>'
+        )
+
+    # ── ③ Zone + 結算磁吸 ──────────────────────────────
     zone_block = ''
     if sh is not None:
-        # 觸及提醒
         alert = ''
         if bh and price <= bh:
             alert = ('<div style="font-size:0.62em;color:#f78166;background:rgba(247,129,102,.1);'
@@ -1152,7 +1290,7 @@ def oi_html_single(d, pfx, label=''):
             f'</div>'
         )
 
-    # ── ③ GEX ──────────────────────────────────────────
+    # ── ④ GEX ──────────────────────────────────────────
     gex_block = ''
     if gex is not None:
         col  = '#3fb950' if gex >= 0 else '#f85149'
@@ -1170,7 +1308,7 @@ def oi_html_single(d, pfx, label=''):
             f'</div>'
         )
 
-    return f'{oi_block}{zone_block}{gex_block}'
+    return f'{oi_block}{smart_block}{zone_block}{gex_block}'
 
 
 def gex_html_single(d, pfx):
@@ -1328,33 +1466,64 @@ def generate_report(stocks, vix, spy_qqq, date_str):
 
     def oi_grid(ed):
         cells = []
+        price = ed.get('price', 0)
         for k in ['w0','w1','w2','w3']:
             lbl   = ed.get(f'{k}_label','')
             exp   = ed.get(f'{k}_expiry','') or ''
             is_mo = ed.get(f'{k}_is_monthly',False)
-            cw, mp, pw = ed.get(f'{k}_call_wall'), ed.get(f'{k}_max_pain'), ed.get(f'{k}_put_wall')
+            gr, mp, gs = ed.get(f'{k}_gex_resist'), ed.get(f'{k}_max_pain'), ed.get(f'{k}_gex_support')
             sh, sl = ed.get(f'{k}_sell_hi'), ed.get(f'{k}_sell_lo')
             bh, bl = ed.get(f'{k}_buy_hi'),  ed.get(f'{k}_buy_lo')
+            cp, cd = ed.get(f'{k}_c_prem'),  ed.get(f'{k}_c_delta')
+            con    = ed.get(f'{k}_consensus')
             exps  = exp[5:] if exp else ''
             mob   = ('<span style="font-size:0.6em;color:#e3b341;background:rgba(227,179,65,.12);'
                      'border:1px solid rgba(227,179,65,.3);border-radius:3px;padding:0 3px;margin-left:2px">月結</span>' if is_mo else '')
             fmt   = lambda v: f'${v:g}' if v is not None else '—'
+            fmtf  = lambda v: f'${v:.2f}' if v is not None else '—'
+
+            # 聰明錢狀態
+            def _sm_row(val, label):
+                if val is None: return ''
+                gap = val - price
+                if gap > 5:     col, icon, note = '#3fb950','📈', f'+{gap:.1f} 多頭'
+                elif gap >= -2: col, icon, note = '#8b949e','⚪', f'{gap:+.1f} 中性'
+                else:           col, icon, note = '#f85149','📉', f'{gap:.1f} 警訊'
+                return (f'<div style="display:flex;justify-content:space-between;white-space:nowrap;margin-top:2px">'
+                        f'<span style="font-size:0.62em;color:#484f58">{label}</span>'
+                        f'<span style="font-family:monospace;font-size:0.72em;color:{col};font-weight:600">{fmtf(val)} {icon}{note}</span>'
+                        f'</div>')
+
+            rel = ''
+            if cp is not None and cd is not None:
+                diff = cp - cd
+                if abs(diff)<=1:   rel = '<div style="font-size:0.58em;color:#e3b341">✅ 資金方向一致</div>'
+                elif diff>1:       rel = '<div style="font-size:0.58em;color:#8b949e">📊 Prem>Delta 賭波動</div>'
+                else:              rel = '<div style="font-size:0.58em;color:#58a6ff">🎯 Delta>Prem 押方向</div>'
+
+            smart_block = ''
+            if cp is not None or cd is not None:
+                smart_block = (f'<div style="margin-top:4px;padding-top:3px;border-top:1px dashed #30363d">'
+                               f'<div style="font-size:0.58em;color:#484f58;margin-bottom:1px">聰明錢</div>'
+                               f'{_sm_row(cp, "💰 Premium")}'
+                               f'{_sm_row(cd, "⚡ Delta")}'
+                               f'{rel}</div>')
+
             zone_block = ''
             if sh is not None:
-                sth = ed.get(f'{k}_settle_hi')
-                stl = ed.get(f'{k}_settle_lo')
-                fmt2 = lambda v: f'${v:.2f}' if v is not None else '—'
+                sth = ed.get(f'{k}_settle_hi'); stl = ed.get(f'{k}_settle_lo')
                 zone_block = (f'<div style="margin-top:4px;padding-top:4px;border-top:1px dashed #30363d">'
-                              f'<div style="font-family:monospace;font-size:0.78em;color:#56d364;font-weight:600">🟢 Sell {fmt(sl)}~{fmt(sh)}</div>'
-                              f'<div style="font-family:monospace;font-size:0.78em;color:#f78166;font-weight:600;margin-top:2px">🔴 Buy {fmt(bl)}~{fmt(bh)}</div>'
-                              f'<div style="font-family:monospace;font-size:0.72em;color:#e3b341;margin-top:2px">📌結算 {fmt2(stl)}~{fmt2(sth)}</div>'
+                              f'<div style="font-size:0.72em;color:#58a6ff;font-weight:600;margin-bottom:1px">五法共識 {fmtf(con)}</div>'
+                              f'<div style="font-family:monospace;font-size:0.78em;color:#56d364;font-weight:600">🟢 Sell {fmtf(sl)}~{fmtf(sh)}</div>'
+                              f'<div style="font-family:monospace;font-size:0.78em;color:#f78166;font-weight:600;margin-top:2px">🔴 Buy {fmtf(bl)}~{fmtf(bh)}</div>'
+                              f'<div style="font-family:monospace;font-size:0.72em;color:#e3b341;margin-top:2px">📌結算 {fmtf(stl)}~{fmtf(sth)}</div>'
                               f'</div>')
             cells.append(f'<div style="background:#21262d;border-radius:6px;padding:7px 10px">'
                          f'<div class="oi-lbl">{lbl} {exps}{mob}</div>'
-                         f'<div class="oi-call" style="font-size:0.85em">▼ {fmt(cw)}</div>'
-                         f'<div class="oi-pain" style="font-size:0.85em">⚡ {fmt(mp)}</div>'
-                         f'<div class="oi-put"  style="font-size:0.85em">▲ {fmt(pw)}</div>'
-                         f'{zone_block}</div>')
+                         f'<div class="oi-call" style="font-size:0.85em">▼ GEX阻力 {fmt(gr)}</div>'
+                         f'<div class="oi-pain" style="font-size:0.85em">⚡ MaxPain {fmt(mp)}</div>'
+                         f'<div class="oi-put"  style="font-size:0.85em">▲ GEX支撐 {fmt(gs)}</div>'
+                         f'{smart_block}{zone_block}</div>')
         return '\n'.join(cells)
 
     now_tw = datetime.now().strftime('%Y-%m-%d %H:%M')
@@ -1366,7 +1535,7 @@ def generate_report(stocks, vix, spy_qqq, date_str):
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>黑叔美股掃描 {display_date} — v7.1</title>
+<title>黑叔美股掃描 {display_date} — v7.2</title>
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
 body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans TC','PingFang TC',sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh;padding:16px;line-height:1.5;font-size:16px}}
@@ -1517,7 +1686,7 @@ td{{padding:11px 13px;vertical-align:top}}
 
 <div class="hdr">
   <div>
-    <h1>📊 美股每日開盤掃描報告 Powered by 黑叔 — v7.1</h1>
+    <h1>📊 美股每日開盤掃描報告 Powered by 黑叔 — v7.2</h1>
   </div>
   <div class="hdr-r">
     <div class="dt">{display_date}</div>
@@ -1552,9 +1721,9 @@ td{{padding:11px 13px;vertical-align:top}}
   <span><span class="ivb ive">偏高</span> 50–75%</span>
   <span><span class="ivb ivh">極高</span> &gt;75%</span>
   <span>｜</span>
-  <span class="oi-call">▼ Call Wall</span>=壓力
+  <span class="oi-call">▼ GEX阻力</span>=做市商賣壓最大 strike
   <span class="oi-pain">⚡ Max Pain</span>=痛苦點
-  <span class="oi-put">▲ Put Wall</span>=支撐
+  <span class="oi-put">▲ GEX支撐</span>=做市商買盤最大 strike
   <span style="color:#e3b341">月結</span>=當月第三週五
   <span>｜</span>
   <span style="color:#56d364;font-weight:600">🟢 Sell Zone</span>=週高壓力區（回測82%蓋頂）　<span style="color:#f78166;font-weight:600">🔴 Buy Zone</span>=週低支撐區（回測79%蓋底）　<span style="color:#e3b341">📌結算</span>=Max Pain±1%磁吸區
@@ -1623,7 +1792,7 @@ td{{padding:11px 13px;vertical-align:top}}
 <div class="ftr">
   ⚠️ 本報告數據來自 Yahoo Finance（yfinance），OI / Max Pain 為真實期權鏈計算，晨星估值為靜態手動更新。僅供參考，不構成投資建議。<br>
   數據來源：Yahoo Finance · yfinance　｜　報告產生：{now_tw} 台灣時間<br>
-  <span style="color:#21262d">v7.1 · 四週OI + HMA/EMA最優參數 + Buy/Sell Zone v4.1（排除CallWall+硬下限）+ 均線評分 + 週五結算磁吸區</span>
+  <span style="color:#21262d">v7.2 · 四週OI + HMA/EMA最優參數 + Buy/Sell Zone v4.1 + 五法共識（對齊flow_analysis）+ 均線評分 + 週五結算磁吸區</span>
 </div>
 
 </div>
@@ -1637,7 +1806,7 @@ td{{padding:11px 13px;vertical-align:top}}
 
 def main():
     print('=' * 50)
-    print('美股每日掃描報告 Powered by 黑叔 - v7.1')
+    print('美股每日掃描報告 Powered by 黑叔 - v7.2')
     print('=' * 50)
 
     date_str    = datetime.now().strftime('%Y%m%d')
