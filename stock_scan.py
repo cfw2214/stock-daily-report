@@ -1642,7 +1642,6 @@ def main():
 
     date_str    = datetime.now().strftime('%Y%m%d')
     output_path = os.path.join(OUTPUT_DIR, 'index.html')
-    dated_path  = os.path.join(OUTPUT_DIR, f'stock_report_{date_str}.html')
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     print('\n[1/4] 抓取 VIX...')
@@ -1660,12 +1659,10 @@ def main():
     print('\n[4/4] 生成 HTML 報告...')
     html = generate_report(stocks, vix, spy_qqq, date_str)
 
-    for path in [output_path, dated_path]:
-        with open(path, 'w', encoding='utf-8') as f:
-            f.write(html)
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(html)
 
     print(f'\n✅ 報告已存至：{output_path}')
-    print(f'   日期版本：{dated_path}')
     print('=' * 50)
 
 
