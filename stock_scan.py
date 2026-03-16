@@ -1259,7 +1259,7 @@ def generate_report(stocks, vix, spy_qqq, date_str):
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>美股每日開盤掃描報告 Powered by 黑叔 - {date_str}</title>
+<title>美股每日開盤掃描報告 Powered by 黑叔 </title>
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
 body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans TC','PingFang TC',sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh;padding:16px;line-height:1.5;font-size:16px}}
