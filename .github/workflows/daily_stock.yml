@@ -2,8 +2,20 @@ name: Daily Stock Report
 
 on:
   schedule:
-        - cron: '45 14 * * 1-5'
+    # === 夏令時間 (EDT, UTC-4): 3月第二個週日 ~ 11月第一個週日 ===
+    # 開盤後15分鐘: 09:45 ET = 13:45 UTC
+    - cron: '45 13 * * 1-5'
+    # 收盤後: 16:00 ET = 20:00 UTC
+    - cron: '0 20 * * 1-5'
+
+    # === 冬令時間 (EST, UTC-5): 11月第一個週日 ~ 3月第二個週日 ===
+    # 開盤後15分鐘: 09:45 ET = 14:45 UTC
+    - cron: '45 14 * * 1-5'
+    # 收盤後: 16:00 ET = 21:00 UTC
+    - cron: '0 21 * * 1-5'
+
   workflow_dispatch:
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
