@@ -1540,8 +1540,10 @@ def generate_report(stocks, vix, spy_qqq, date_str):
         return '\n'.join(cells)
 
     now_tw = now_taiwan().strftime('%Y-%m-%d %H:%M')
-    wd = {0:'一',1:'二',2:'三',3:'四',4:'五',5:'六',6:'日'}[now_us_eastern().weekday()]
-    display_date = now_us_eastern().strftime(f'%Y年%m月%d日（週{wd}）')
+    now_us = now_us_eastern()
+    now_us_str = now_us.strftime('%Y-%m-%d %H:%M')
+    wd = {0:'一',1:'二',2:'三',3:'四',4:'五',5:'六',6:'日'}[now_us.weekday()]
+    display_date = now_us.strftime(f'%Y年%m月%d日（週{wd}）')
 
     return f'''<!DOCTYPE html>
 <html lang="zh-TW">
@@ -1703,7 +1705,7 @@ td{{padding:11px 13px;vertical-align:top}}
   </div>
   <div class="hdr-r">
     <div class="dt">{display_date}</div>
-    <div>頁面生成：{now_tw} 台灣時間　｜　本機生成</div>
+    <div>頁面生成：{now_tw} 台灣時間<br>{now_us_str} 美國時間 (ET)</div>
   </div>
 </div>
 
@@ -1804,7 +1806,7 @@ td{{padding:11px 13px;vertical-align:top}}
 
 <div class="ftr">
   ⚠️ 本報告數據來自 Yahoo Finance（yfinance），OI / Max Pain 為真實期權鏈計算，晨星估值為靜態手動更新。僅供參考，不構成投資建議。<br>
-  數據來源：Yahoo Finance · yfinance　｜　報告產生：{now_tw} 台灣時間<br>
+  數據來源：Yahoo Finance · yfinance　｜　報告產生：{now_tw} 台灣時間｜{now_us_str} 美國時間 (ET)<br>
   <span style="color:#21262d">v7.2 · 四週OI + HMA/EMA最優參數 + Buy/Sell Zone v4.1 + 五法共識（對齊flow_analysis）+ 均線評分 + 週五結算磁吸區</span>
 </div>
 
