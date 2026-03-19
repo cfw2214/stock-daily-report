@@ -1805,9 +1805,7 @@ td{{padding:11px 13px;vertical-align:top}}
 </div>
 
 <div class="ftr">
-  ⚠️ 本報告數據來自 Yahoo Finance（yfinance），OI / Max Pain 為真實期權鏈計算，晨星估值為靜態手動更新。僅供參考，不構成投資建議。<br>
-  數據來源：Yahoo Finance · yfinance　｜　報告產生：{now_tw} 台灣時間｜{now_us_str} 美國時間 (ET)<br>
-  <span style="color:#21262d">v7.2 · 四週OI + HMA/EMA最優參數 + Buy/Sell Zone v4.1 + 五法共識（對齊flow_analysis）+ 均線評分 + 週五結算磁吸區</span>
+  數據僅供參考，不構成投資建議。 Design ＆ Research by 我是黑叔
 </div>
 
 </div>
