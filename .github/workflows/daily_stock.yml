@@ -5,12 +5,16 @@ on:
     # === 夏令時間 (EDT, UTC-4): 3月第二個週日 ~ 11月第一個週日 ===
     # 開盤後15分鐘: 09:45 ET = 13:45 UTC
     - cron: '45 13 * * 1-5'
+    # 盤中: 12:00 ET = 16:00 UTC
+    - cron: '0 16 * * 1-5'
     # 收盤後: 16:00 ET = 20:00 UTC
     - cron: '0 20 * * 1-5'
 
     # === 冬令時間 (EST, UTC-5): 11月第一個週日 ~ 3月第二個週日 ===
     # 開盤後15分鐘: 09:45 ET = 14:45 UTC
     - cron: '45 14 * * 1-5'
+    # 盤中: 12:00 ET = 17:00 UTC
+    - cron: '0 17 * * 1-5'
     # 收盤後: 16:00 ET = 21:00 UTC
     - cron: '0 21 * * 1-5'
 
@@ -25,27 +29,21 @@ permissions:
 jobs:
   generate-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
       - name: Install dependencies
         run: pip install -r requirements.txt
-
       - name: Create output directory
         run: mkdir -p output
-
       - name: Run stock scan
         env:
           OUTPUT_DIR: ./output
         run: python stock_scan.py
-
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
