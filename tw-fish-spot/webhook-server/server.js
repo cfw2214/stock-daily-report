@@ -1,209 +1,234 @@
-require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
+require('dotenv').config();
 
 const app = express();
 app.use(express.json());
 
-// 配置
 const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-const WEBSITE_URL = 'https://cfw2214.github.io/tw-fish-spot/';
-const SPOTS_JSON_URL = 'https://cfw2214.github.io/tw-fish-spot/spots.json';
+const WEBSITE_URL = 'https://cfw2214.github.io/tw-fish-spot';
 
-let SPOTS = [];
+let spotsData = [];
 
-// ==================
-// 初始化：載入釣點數據
-// ==================
-async function initializeSpots() {
+async function loadSpotsData() {
   try {
-    console.log('🔄 正在載入釣點數據...');
-    const response = await axios.get(SPOTS_JSON_URL);
-    SPOTS = response.data;
-    console.log(`✅ 已載入 ${SPOTS.length} 個釣點`);
+    const response = await axios.get(`${WEBSITE_URL}/spots.json`);
+    spotsData = response.data;
+    console.log(`✅ 已載入 ${spotsData.length} 個釣點`);
   } catch (error) {
-    console.error('❌ 載入釣點數據失敗:', error.message);
-    SPOTS = [];
+    console.error('❌ 無法載入釣點資料:', error.message);
+    spotsData = [];
   }
 }
 
-// ==================
-// 搜尋釣點函數
-// ==================
-function searchSpots(query) {
-  if (!query || query.trim() === '') {
-    return [];
-  }
+loadSpotsData();
+setInterval(loadSpotsData, 60 * 60 * 1000);
 
-  const normalizedQuery = query.trim();
-  
-  // 精確匹配名稱
-  const exactMatch = SPOTS.find(spot => spot.name === normalizedQuery);
-  if (exactMatch) {
-    return [exactMatch];
-  }
-
-  // 模糊搜尋（包含關鍵字）
-  return SPOTS.filter(spot => 
-    spot.name.includes(normalizedQuery) || 
-    spot.area.includes(normalizedQuery)
-  ).slice(0, 5); // 最多回傳 5 個結果
+function searchSpots(keyword) {
+  if (!keyword) return [];
+  const lowerKeyword = keyword.toLowerCase();
+  return spotsData.filter(spot =>
+    spot.name.includes(keyword) ||
+    spot.area.includes(keyword) ||
+    spot.type.includes(keyword) ||
+    spot.note.includes(keyword)
+  ).slice(0, 5);
 }
 
-// ==================
-// 生成查詢連結
-// ==================
-function generateQueryUrl(spotName, date, time = '08:00') {
-  const params = new URLSearchParams({
-    spot: spotName,
-    date: date || new Date().toISOString().split('T')[0],
-    time: time
-  });
-  return `${WEBSITE_URL}?${params.toString()}`;
-}
+function generateFlexMessage(spot) {
+  const weatherUrl = `${WEBSITE_URL}?lat=${spot.lat}&lng=${spot.lng}&spot=${encodeURIComponent(spot.name)}`;
 
-// ==================
-// 取得台灣目前日期
-// ==================
-function getTWDateString() {
-  const now = new Date();
-  const tw = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
-  const y = tw.getFullYear();
-  const m = String(tw.getMonth() + 1).padStart(2, '0');
-  const d = String(tw.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-// ==================
-// 回覆用戶函數
-// ==================
-async function replyToUser(replyToken, messages) {
-  try {
-    await axios.post(
-      'https://api.messaging.line.biz/v2/bot/message/reply',
-      {
-        replyToken: replyToken,
-        messages: Array.isArray(messages) ? messages : [messages]
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-    console.log('✅ 訊息已回覆');
-  } catch (error) {
-    console.error('❌ 回覆失敗:', error.response?.data || error.message);
-  }
-}
-
-// ==================
-// Webhook 路由
-// ==================
-app.post('/webhook', async (req, res) => {
-  try {
-    const events = req.body.events || [];
-    console.log(`📨 收到 ${events.length} 個事件`);
-
-    for (const event of events) {
-      // 只處理文字訊息
-      if (event.type !== 'message' || event.message.type !== 'text') {
-        continue;
-      }
-
-      const userMessage = event.message.text.trim();
-      const replyToken = event.replyToken;
-
-      console.log(`👤 用戶訊息: "${userMessage}"`);
-
-      // 搜尋釣點
-      const results = searchSpots(userMessage);
-
-      if (results.length === 0) {
-        // 找不到釣點
-        const notFoundMessage = {
+  return {
+    type: 'bubble',
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      contents: [
+        {
           type: 'text',
-          text: `找不到 "${userMessage}" 這個釣點 😅\n\n可試試：\n• 野柳港\n• 基隆外木山\n• 東北角區\n• 淡水三芝\n• 金山萬里\n\n或輸入釣點名稱查詢 🎣`
-        };
-        await replyToUser(replyToken, notFoundMessage);
-      } else if (results.length === 1) {
-        // 找到一個釣點 → 顯示 Button Template
-        const spot = results[0];
-        const today = getTWDateString();
-        const queryUrl = generateQueryUrl(spot.name, today, '08:00');
-
-        const spotMessage = {
-          type: 'template',
-          altText: `查詢 ${spot.name}`,
-          template: {
-            type: 'buttons',
-            title: spot.name,
-            text: `📍 區域：${spot.area}\n🎣 類型：${spot.type}${spot.allowed ? '' : '\n⚠️ 禁釣區'}`,
-            actions: [
-              {
+          text: spot.name,
+          weight: 'bold',
+          size: 'lg',
+          color: '#1DB446'
+        },
+        {
+          type: 'box',
+          layout: 'baseline',
+          margin: 'md',
+          contents: [
+            {
+              type: 'text',
+              text: '📍 區域',
+              color: '#aaaaaa',
+              size: 'sm',
+              flex: 1
+            },
+            {
+              type: 'text',
+              text: spot.area,
+              wrap: true,
+              color: '#666666',
+              size: 'sm',
+              flex: 5
+            }
+          ]
+        },
+        {
+          type: 'box',
+          layout: 'baseline',
+          margin: 'md',
+          contents: [
+            {
+              type: 'text',
+              text: '🎣 類型',
+              color: '#aaaaaa',
+              size: 'sm',
+              flex: 1
+            },
+            {
+              type: 'text',
+              text: spot.type,
+              wrap: true,
+              color: '#666666',
+              size: 'sm',
+              flex: 5
+            }
+          ]
+        },
+        ...(spot.note ? [{
+          type: 'box',
+          layout: 'baseline',
+          margin: 'md',
+          contents: [
+            {
+              type: 'text',
+              text: '📝 備註',
+              color: '#aaaaaa',
+              size: 'sm',
+              flex: 1
+            },
+            {
+              type: 'text',
+              text: spot.note,
+              wrap: true,
+              color: '#666666',
+              size: 'sm',
+              flex: 5
+            }
+          ]
+        }] : []),
+        {
+          type: 'box',
+          layout: 'vertical',
+          margin: 'lg',
+          spacing: 'sm',
+          contents: [
+            {
+              type: 'button',
+              style: 'link',
+              height: 'sm',
+              action: {
                 type: 'uri',
                 label: '🌤️ 查詢天氣詳情',
-                uri: queryUrl
-              },
-              {
-                type: 'message',
-                label: '📋 推薦其他釣點',
-                text: '推薦'
+                uri: weatherUrl
               }
-            ]
-          }
-        };
+            },
+            {
+              type: 'button',
+              style: 'link',
+              height: 'sm',
+              action: {
+                type: 'uri',
+                label: '📋 推薦其他釣點',
+                uri: WEBSITE_URL
+              }
+            }
+          ]
+        }
+      ]
+    }
+  };
+}
 
-        await replyToUser(replyToken, spotMessage);
-      } else {
-        // 找到多個釣點 → 用 Carousel 或文字列表
-        const spotList = results
-          .map((s, idx) => `${idx + 1}. ${s.name} (${s.area})`)
-          .join('\n');
+app.post('/webhook', (req, res) => {
+  const body = req.body;
 
-        const multipleMessage = {
-          type: 'text',
-          text: `找到 ${results.length} 個釣點：\n\n${spotList}\n\n請輸入完整釣點名稱查詢詳情 🎣`
-        };
+  if (!body.events || !Array.isArray(body.events)) {
+    return res.status(400).json({ error: 'Invalid request' });
+  }
 
-        await replyToUser(replyToken, multipleMessage);
-      }
+  body.events.forEach(async (event) => {
+    if (event.type !== 'message' || event.message.type !== 'text') {
+      return;
     }
 
-    res.status(200).send('OK');
-  } catch (error) {
-    console.error('❌ Webhook 錯誤:', error);
-    res.status(500).send('Internal Server Error');
-  }
+    const userMessage = event.message.text;
+    const replyToken = event.replyToken;
+
+    try {
+      const results = searchSpots(userMessage);
+
+      let replyMessage;
+
+      if (results.length === 0) {
+        replyMessage = {
+          type: 'text',
+          text: `找不到「${userMessage}」相關的釣點。\n\n💡 試試看：\n• 輸入釣點名稱（如：野柳港）\n• 輸入區域名稱（如：金山萬里）\n• 輸入釣點類型（如：野場）\n\n📍 造訪官網查看完整釣點列表：${WEBSITE_URL}`
+        };
+      } else if (results.length === 1) {
+        replyMessage = {
+          type: 'flex',
+          altText: results[0].name,
+          contents: {
+            type: 'carousel',
+            contents: [generateFlexMessage(results[0])]
+          }
+        };
+      } else {
+        replyMessage = {
+          type: 'flex',
+          altText: `找到 ${results.length} 個釣點`,
+          contents: {
+            type: 'carousel',
+            contents: results.map(spot => generateFlexMessage(spot))
+          }
+        };
+      }
+
+      await axios.post(
+        'https://api.messaging.line.biz/v2/bot/message/reply',
+        {
+          replyToken: replyToken,
+          messages: [replyMessage]
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log(`✅ 已回覆: ${userMessage}`);
+    } catch (error) {
+      console.error('❌ 回覆失敗:', error.response?.data || error.message);
+    }
+  });
+
+  res.status(200).json({ ok: true });
 });
 
-// ==================
-// 健康檢查路由
-// ==================
 app.get('/health', (req, res) => {
   res.status(200).json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    spotsLoaded: SPOTS.length
+    status: 'OK',
+    spotsLoaded: spotsData.length,
+    timestamp: new Date().toISOString()
   });
 });
 
-// ==================
-// 啟動伺服器
-// ==================
 const PORT = process.env.PORT || 3000;
-
-// 在啟動前先載入釣點
-initializeSpots().then(() => {
-  app.listen(PORT, () => {
-    console.log(`\n🎣 釣點 Webhook 伺服器已啟動`);
-    console.log(`📍 監聽埠位: ${PORT}`);
-    console.log(`🌐 健康檢查: http://localhost:${PORT}/health`);
-    console.log(`📨 Webhook 路由: http://localhost:${PORT}/webhook\n`);
-  });
+app.listen(PORT, () => {
+  console.log(`🚀 Webhook 伺服器運行於 http://localhost:${PORT}`);
+  console.log(`📡 Webhook 端點: http://localhost:${PORT}/webhook`);
+  console.log(`💚 健康檢查: http://localhost:${PORT}/health`);
 });
-
-module.exports = app;
