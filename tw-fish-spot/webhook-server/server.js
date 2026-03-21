@@ -196,7 +196,7 @@ app.post('/webhook', (req, res) => {
       }
 
       await axios.post(
-        'https://api.messaging.line.biz/v2/bot/message/reply',
+        'https://api.line.biz/v2/bot/message/reply',
         {
           replyToken: replyToken,
           messages: [replyMessage]
