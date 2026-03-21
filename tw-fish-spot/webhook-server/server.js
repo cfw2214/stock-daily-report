@@ -82,7 +82,7 @@ function getTWDateString() {
 async function replyToUser(replyToken, messages) {
   try {
     await axios.post(
-      'https://api.line.biz/v2/bot/message/reply',
+      'https://api.messaging.line.biz/v2/bot/message/reply',
       {
         replyToken: replyToken,
         messages: Array.isArray(messages) ? messages : [messages]
