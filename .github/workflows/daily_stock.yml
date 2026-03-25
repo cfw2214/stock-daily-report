@@ -2,22 +2,12 @@ name: Daily Stock Report
 
 on:
   schedule:
-    # === 夏令時間 (EDT, UTC-4): 3月第二個週日 ~ 11月第一個週日 ===
-    # 開盤後15分鐘: 09:45 ET = 13:45 UTC
     - cron: '45 13 * * 1-5'
-    # 盤中: 12:00 ET = 16:00 UTC
     - cron: '0 16 * * 1-5'
-    # 收盤後: 16:00 ET = 20:00 UTC
     - cron: '0 20 * * 1-5'
-
-    # === 冬令時間 (EST, UTC-5): 11月第一個週日 ~ 3月第二個週日 ===
-    # 開盤後15分鐘: 09:45 ET = 14:45 UTC
     - cron: '45 14 * * 1-5'
-    # 盤中: 12:00 ET = 17:00 UTC
     - cron: '0 17 * * 1-5'
-    # 收盤後: 16:00 ET = 21:00 UTC
     - cron: '0 21 * * 1-5'
-
   workflow_dispatch:
 
 env:
@@ -32,19 +22,62 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      - name: Check ET trading window
+        id: time_check
+        run: |
+          python3 - <<'EOF'
+          from datetime import datetime, timezone, timedelta
+          import os
+
+          def is_dst(utc_now):
+              year = utc_now.year
+              march = datetime(year, 3, 1, 2, 0, tzinfo=timezone.utc)
+              march_second_sunday = march + timedelta(days=(6 - march.weekday()) % 7 + 7)
+              nov = datetime(year, 11, 1, 2, 0, tzinfo=timezone.utc)
+              nov_first_sunday = nov + timedelta(days=(6 - nov.weekday()) % 7)
+              return march_second_sunday <= utc_now < nov_first_sunday
+
+          utc_now = datetime.now(timezone.utc)
+          offset = -4 if is_dst(utc_now) else -5
+          et_now = utc_now + timedelta(hours=offset)
+          print(f"UTC: {utc_now.strftime('%Y-%m-%d %H:%M')}")
+          print(f"ET:  {et_now.strftime('%Y-%m-%d %H:%M')} (UTC{offset})")
+
+          target_times = [(9, 45), (12, 0), (16, 0)]
+          et_minutes = et_now.hour * 60 + et_now.minute
+          matched = any(abs(et_minutes - (h * 60 + m)) <= 10 for h, m in target_times)
+
+          github_output = os.environ.get("GITHUB_OUTPUT", "")
+          if matched:
+              print("✅ 符合交易時段，執行報告")
+              open(github_output, "a").write("should_run=true\n")
+          else:
+              print(f"⏭️ 非目標時段（ET {et_now.strftime('%H:%M')}），跳過")
+              open(github_output, "a").write("should_run=false\n")
+          EOF
+
       - name: Install dependencies
+        if: steps.time_check.outputs.should_run == 'true'
         run: pip install -r requirements.txt
+
       - name: Create output directory
+        if: steps.time_check.outputs.should_run == 'true'
         run: mkdir -p output
+
       - name: Run stock scan
+        if: steps.time_check.outputs.should_run == 'true'
         env:
           OUTPUT_DIR: ./output
         run: python stock_scan.py
+
       - name: Deploy to GitHub Pages
+        if: steps.time_check.outputs.should_run == 'true'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
