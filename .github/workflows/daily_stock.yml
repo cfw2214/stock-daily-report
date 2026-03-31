@@ -2,78 +2,44 @@ name: Daily Stock Report
 
 on:
   schedule:
-    - cron: '0 14 * * 1-5'   # 夏令(EDT) 10:00 AM ET = UTC 14:00
-    - cron: '0 16 * * 1-5'   # 夏令(EDT) 12:00 PM ET = UTC 16:00
-    - cron: '0 20 * * 1-5'   # 夏令(EDT) 04:00 PM ET = UTC 20:00
-    - cron: '0 15 * * 1-5'   # 冬令(EST) 10:00 AM ET = UTC 15:00
-    - cron: '0 17 * * 1-5'   # 冬令(EST) 12:00 PM ET = UTC 17:00
-    - cron: '0 21 * * 1-5'   # 冬令(EST) 04:00 PM ET = UTC 21:00
-  workflow_dispatch:
+      - cron: '0 14 * * 1-5' # 夏令(EDT) 10:00 AM ET = UTC 14:00
+          - cron: '0 16 * * 1-5' # 夏令(EDT) 12:00 PM ET = UTC 16:00
+              - cron: '0 20 * * 1-5' # 夏令(EDT) 04:00 PM ET = UTC 20:00
+                  - cron: '0 15 * * 1-5' # 冬令(EST) 10:00 AM ET = UTC 15:00
+                      - cron: '0 17 * * 1-5' # 冬令(EST) 12:00 PM ET = UTC 17:00
+                          - cron: '0 21 * * 1-5' # 冬令(EST) 04:00 PM ET = UTC 21:00
+                            workflow_dispatch:
 
-permissions:
-  contents: write
+                            permissions:
+                              contents: write
 
-jobs:
-  generate-and-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v5
+                              jobs:
+                                generate-and-deploy:
+                                    runs-on: ubuntu-latest
+                                        steps:
+                                              - name: Checkout repo
+                                                      uses: actions/checkout@v5
 
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.11'
+                                                            - name: Setup Python
+                                                                    uses: actions/setup-python@v6
+                                                                            with:
+                                                                                      python-version: '3.11'
 
-      - name: Check ET trading window
-        id: time_check
-        run: |
-          python3 - <<'EOF'
-          from datetime import datetime, timezone, timedelta
-          import os
-          def is_dst(utc_now):
-            year = utc_now.year
-            march = datetime(year, 3, 1, 2, 0, tzinfo=timezone.utc)
-            march_second_sunday = march + timedelta(days=(6 - march.weekday()) % 7 + 7)
-            nov = datetime(year, 11, 1, 2, 0, tzinfo=timezone.utc)
-            nov_first_sunday = nov + timedelta(days=(6 - nov.weekday()) % 7)
-            return march_second_sunday <= utc_now < nov_first_sunday
-          utc_now = datetime.now(timezone.utc)
-          offset = -4 if is_dst(utc_now) else -5
-          et_now = utc_now + timedelta(hours=offset)
-          print(f"UTC: {utc_now.strftime('%Y-%m-%d %H:%M')}")
-          print(f"ET: {et_now.strftime('%Y-%m-%d %H:%M')} (UTC{offset})")
-          target_times = [(10, 0), (12, 0), (16, 0)]
-          et_minutes = et_now.hour * 60 + et_now.minute
-          matched = any(abs(et_minutes - (h * 60 + m)) <= 10 for h, m in target_times)
-          github_output = os.environ.get("GITHUB_OUTPUT", "")
-          if matched:
-            print("✅ 符合交易時段，執行報告")
-            open(github_output, "a").write("should_run=true\n")
-          else:
-            print(f"⏭️ 非目標時段（ET {et_now.strftime('%H:%M')}），跳過")
-            open(github_output, "a").write("should_run=false\n")
-          EOF
-
-      - name: Install dependencies
-        if: steps.time_check.outputs.should_run == 'true'
-        run: pip install -r requirements.txt
-
-      - name: Create output directory
-        if: steps.time_check.outputs.should_run == 'true'
-        run: mkdir -p output
-
-      - name: Run stock scan
-        if: steps.time_check.outputs.should_run == 'true'
-        env:
-          OUTPUT_DIR: ./output
-        run: python stock_scan.py
-
-      - name: Deploy to GitHub Pages
-        if: steps.time_check.outputs.should_run == 'true'
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./output
-          keep_files: true
-          commit_message: "update stock report"
+                                                                                            - name: Install dependencies
+                                                                                                    run: pip install -r requirements.txt
+                                                                                                    
+                                                                                                          - name: Create output directory
+                                                                                                                  run: mkdir -p output
+                                                                                                                  
+                                                                                                                        - name: Run stock scan
+                                                                                                                                env:
+                                                                                                                                          OUTPUT_DIR: ./output
+                                                                                                                                                  run: python stock_scan.py
+                                                                                                                                                  
+                                                                                                                                                        - name: Deploy to GitHub Pages
+                                                                                                                                                                uses: peaceiris/actions-gh-pages@v4
+                                                                                                                                                                        with:
+                                                                                                                                                                                  github_token: ${{ secrets.GITHUB_TOKEN }}
+                                                                                                                                                                                            publish_dir: ./output
+                                                                                                                                                                                                      keep_files: true
+                                                                                                                                                                                                                commit_message: "update stock report"
